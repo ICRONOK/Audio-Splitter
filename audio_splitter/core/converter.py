@@ -179,11 +179,19 @@ class AudioConverter:
     def _convert_to_wav(self, input_path: Path, output_path: Path) -> bool:
         """Convierte archivo a formato WAV"""
         try:
-            # Cargar audio con librosa (soporta múltiples formatos)
-            y, sr = librosa.load(str(input_path), sr=None)
+            # Cargar audio con librosa preservando canales originales
+            y, sr = librosa.load(str(input_path), sr=None, mono=False)
             
-            # Guardar como WAV
-            sf.write(str(output_path), y, sr, format='WAV')
+            # Preparar datos de audio para escritura
+            if len(y.shape) == 1:
+                # Audio mono
+                audio_data = y
+            else:
+                # Audio multicanal - transponer para soundfile
+                audio_data = y.T
+            
+            # Guardar como WAV preservando calidad original
+            sf.write(str(output_path), audio_data, sr, format='WAV')
             return True
             
         except Exception as e:
@@ -215,16 +223,40 @@ class AudioConverter:
     def _convert_to_flac(self, input_path: Path, output_path: Path, quality: str) -> bool:
         """Convierte archivo a formato FLAC"""
         try:
-            # Cargar con librosa
-            y, sr = librosa.load(str(input_path), sr=None)
+            # Cargar con librosa preservando canales y frecuencia original
+            y, sr = librosa.load(str(input_path), sr=None, mono=False)
             
             # Configurar nivel de compresión FLAC
             quality_settings = self.QUALITY_PRESETS['flac'].get(quality, self.QUALITY_PRESETS['flac']['high'])
             compression_level = quality_settings['compression_level']
             
-            # Guardar como FLAC
-            sf.write(str(output_path), y, sr, format='FLAC', subtype='PCM_16')
+            # Determinar el subtipo basado en el archivo original
+            try:
+                info = sf.info(str(input_path))
+                original_subtype = info.subtype
+                # Usar PCM_24 por defecto para FLAC para mejor calidad
+                if 'PCM_32' in original_subtype or 'FLOAT' in original_subtype:
+                    subtype = 'PCM_24'
+                elif 'PCM_24' in original_subtype:
+                    subtype = 'PCM_24'
+                else:
+                    subtype = 'PCM_16'  # Fallback para archivos de menor calidad
+            except:
+                subtype = 'PCM_24'  # Default seguro
             
+            # Preparar datos de audio para escritura
+            if len(y.shape) == 1:
+                # Audio mono
+                audio_data = y
+            else:
+                # Audio multicanal - transponer para soundfile
+                audio_data = y.T
+            
+            # Guardar como FLAC con nivel de compresión
+            sf.write(str(output_path), audio_data, sr, 
+                    format='FLAC', subtype=subtype)
+            
+            console.print(f"[green]✓ FLAC creado:[/green] {subtype}, {sr}Hz, compresión nivel {compression_level}")
             return True
             
         except Exception as e:
