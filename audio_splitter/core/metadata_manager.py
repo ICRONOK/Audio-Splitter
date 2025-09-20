@@ -28,6 +28,11 @@ try:
 except ImportError:
     PILLOW_AVAILABLE = False
 
+# Custom exception for metadata operations
+class MetadataError(Exception):
+    """Exception raised for metadata-related errors"""
+    pass
+
 # UI y utilidades
 from rich.console import Console
 from rich.table import Table
@@ -717,6 +722,9 @@ def _display_metadata_table(metadata: AudioMetadata, title: str):
         table.add_row("[dim]Sin metadatos[/dim]", "[dim]Archivo sin tags[/dim]")
     
     console.print(table)
+
+# Backward compatibility alias for tests
+MetadataManager = MetadataEditor
 
 if __name__ == "__main__":
     interactive_mode()
