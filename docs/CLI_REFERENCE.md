@@ -220,8 +220,8 @@ python main.py channel INPUT [OPTIONS]
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--output, -o` | string |  | Output file or directory path |
-| `--channels, -c` | choice |  | Target number of channels (1=mono, 2=stereo) |
+| `--output, -o` | string |  | Output file or directory path (required unless using --analyze) |
+| `--channels, -c` | choice |  | Target number of channels (1=mono, 2=stereo) (required unless using --analyze) |
 | `--algorithm, -a` | choice | downmix_center | Mixing algorithm for stereo→mono conversion |
 | `--batch` | flag | False | Enable batch conversion mode |
 | `--recursive, -r` | flag | False | Search recursively in subdirectories |

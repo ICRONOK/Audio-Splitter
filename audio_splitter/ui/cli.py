@@ -148,8 +148,8 @@ def create_parser():
     # Comando channel - Nuevo comando para conversión de canales
     channel_parser = subparsers.add_parser('channel', help='Convertir canales de audio (mono ↔ stereo)')
     channel_parser.add_argument('input', help='Archivo o directorio de entrada')
-    channel_parser.add_argument('--output', '-o', required=True, help='Archivo o directorio de salida')
-    channel_parser.add_argument('--channels', '-c', required=True, type=int, choices=[1, 2],
+    channel_parser.add_argument('--output', '-o', help='Archivo o directorio de salida')
+    channel_parser.add_argument('--channels', '-c', type=int, choices=[1, 2],
                                help='Número de canales objetivo (1=mono, 2=stereo)')
     channel_parser.add_argument('--algorithm', '-a', default='downmix_center',
                                choices=['downmix_center', 'left_only', 'right_only', 'average'],
@@ -371,7 +371,7 @@ def handle_convert_command(args):
                     args.input, args.output, args.format, args.quality, True
                 )
                 
-                if result['status'] == 'success':
+                if result['success']:
                     console.print("[green]✓ Conversión exitosa con validación de calidad[/green]")
                     
                     # Mostrar métricas si se solicitó
@@ -460,6 +460,15 @@ def handle_channel_command(args):
     """Maneja el comando channel - Conversión de canales con algoritmos científicos"""
     try:
         converter = AudioConverter()
+        
+        # Validar argumentos requeridos cuando no se usa --analyze
+        if not args.analyze:
+            if not args.output:
+                console.print("[red]Error: --output/-o es requerido para conversión[/red]")
+                return False
+            if not args.channels:
+                console.print("[red]Error: --channels/-c es requerido para conversión[/red]")
+                return False
         
         if args.analyze:
             # Solo análisis, sin conversión

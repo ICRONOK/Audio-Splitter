@@ -229,15 +229,15 @@ commands:
       output:
         flags: ["--output", "-o"]
         type: "string"
-        required: true
-        description: "Output file or directory path"
+        required: false
+        description: "Output file or directory path (required unless using --analyze)"
         
       channels:
         flags: ["--channels", "-c"]
         type: "choice"
         choices: [1, 2]
-        required: true
-        description: "Target number of channels (1=mono, 2=stereo)"
+        required: false
+        description: "Target number of channels (1=mono, 2=stereo) (required unless using --analyze)"
         
       algorithm:
         flags: ["--algorithm", "-a"]
