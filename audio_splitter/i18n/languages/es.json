@@ -109,7 +109,16 @@
     "conversion_error_standard": "❌ Error en conversión estándar",
     "quality_result": "Calidad del resultado: {emoji} {level}",
     "import_error": "❌ Error importando Audio Converter: {error}",
-    "execution_error": "❌ Error ejecutando Audio Converter: {error}"
+    "execution_error": "❌ Error ejecutando Audio Converter: {error}",
+    "single_desc": "Convertir un archivo",
+    "batch_desc": "Convertir múltiples archivos",
+    "select_mode": "Selecciona modo",
+    "format_selection": "📁 Formato de salida",
+    "select_format": "Selecciona formato",
+    "enable_validation": "🔬 ¿Activar validación de calidad?",
+    "conversion_success": "Conversión exitosa",
+    "conversion_error": "Error en conversión",
+    "batch_coming_soon": "📦 Conversión por lotes - Próximamente en Fase 2"
   },
   "splitter": {
     "title": "✂️ Audio Splitter Enhanced", 
@@ -290,10 +299,50 @@
     "batch_processing": "Procesando conversión por lotes",
     "batch_success": "Conversión por lotes completada: {successful} archivos procesados",
     "batch_partial": "Conversión parcial: {successful} exitosos, {failed} fallidos",
-    "batch_error": "❌ Error en conversión por lotes: {error}"
+    "batch_error": "❌ Error en conversión por lotes: {error}",
+    "scientific_analysis": "Análisis científico avanzado",
+    "quality_unavailable": "⚠️ Análisis científico no disponible",
+    "scientific_metrics": "🔬 Métricas Científicas de Calidad",
+    "scientific_table": "Análisis de Calidad Profesional",
+    "metric_type": "Métrica",
+    "metric_value": "Valor",
+    "metric_standard": "Estándar",
+    "metric_status": "Estado",
+    "multichannel_note": "Análisis por canal individual:",
+    "channel_analysis": "Canal {num}:",
+    "stereo_mix_analysis": "🎭 Análisis del Mix Estéreo:",
+    "no_scientific_data": "⚠️ No hay datos científicos disponibles",
+    "scientific_note": "Nota: Estándares profesionales - THD+N <-60dB, SNR >90dB, Estudio: THD+N <-80dB, SNR >100dB"
   },
   "progress": {
     "progress_format": "Progreso: {current}/{total} - {message}"
+  },
+  "workflows": {
+    "coming_soon": "🔄 Professional Workflows - Implementación en Fase 2"
+  },
+  "artwork": {
+    "coming_soon": "🖼️ Artwork Manager multiidioma - Próximamente"
+  },
+  "metadata": {
+    "coming_soon": "🏷️ Metadata Editor multiidioma - Próximamente"
+  },
+  "spectrogram": {
+    "coming_soon": "📊 Spectrogram Generator multiidioma - Próximamente"
+  },
+  "documentation": {
+    "coming_soon": "📄 Documentación multiidioma - Próximamente"
+  },
+  "quality": {
+    "current_settings": "📊 Configuración Actual",
+    "active_profile": "Perfil activo",
+    "enhanced_algorithms": "Algoritmos mejorados",
+    "validation_enabled": "Validación activada",
+    "metrics_display": "Mostrar métricas",
+    "select_option": "Selecciona opción",
+    "profile_change_coming_soon": "🏆 Cambio de perfil - Implementación completa próximamente",
+    "preferences_coming_soon": "⚙️ Configuración de preferencias - Próximamente",
+    "thresholds_coming_soon": "🔧 Umbrales personalizados - Próximamente",
+    "reset_coming_soon": "🔄 Restablecimiento - Próximamente"
   },
   "status_indicators": {
     "yes": "SÍ",
