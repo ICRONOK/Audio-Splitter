@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
+import numpy as np
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
@@ -93,7 +94,7 @@ def run_channel_converter():
 
 def run_channel_analysis(input_file: str):
     """
-    Ejecutar análisis completo de propiedades de canal
+    Ejecutar análisis completo de propiedades de canal con métricas científicas
     
     Args:
         input_file: Archivo de audio para analizar
@@ -108,14 +109,56 @@ def run_channel_analysis(input_file: str):
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            task = progress.add_task(t('channel.analysis_progress', 'Analizando audio'), total=None)
+            # Task 1: Basic channel analysis
+            task1 = progress.add_task(t('channel.analysis_progress', 'Analizando audio'), total=None)
             
             # Ejecutar análisis usando AudioConverter existente
             analysis = converter.analyze_channel_properties(input_file)
+            progress.update(task1, completed=True)
             
-            progress.update(task, completed=True)
+            # Task 2: Advanced scientific analysis
+            task2 = progress.add_task(t('channel.scientific_analysis', 'Análisis científico avanzado'), total=None)
+            
+            # Import quality framework for advanced metrics
+            try:
+                from ..core.quality_framework import AudioQualityAnalyzer
+                
+                # Load audio for quality analysis
+                import librosa
+                y, sr = librosa.load(str(input_file), sr=None, mono=False)
+                
+                quality_analyzer = AudioQualityAnalyzer()
+                
+                # Analyze each channel separately for scientific metrics
+                if len(y.shape) == 1:
+                    # Mono analysis
+                    quality_metrics = quality_analyzer.analyze_audio_quality(y, sr)
+                    analysis['quality_metrics'] = {
+                        'overall': quality_metrics
+                    }
+                else:
+                    # Multi-channel analysis
+                    quality_metrics = {}
+                    for i in range(y.shape[0]):
+                        channel_metrics = quality_analyzer.analyze_audio_quality(y[i], sr)
+                        quality_metrics[f'channel_{i}'] = channel_metrics
+                    
+                    # Overall stereo analysis
+                    if y.shape[0] >= 2:
+                        # Analyze stereo mix
+                        stereo_mix = np.mean(y[:2], axis=0)  # Simple stereo downmix
+                        overall_metrics = quality_analyzer.analyze_audio_quality(stereo_mix, sr)
+                        quality_metrics['stereo_mix'] = overall_metrics
+                    
+                    analysis['quality_metrics'] = quality_metrics
+                    
+            except ImportError:
+                console.print(f"[yellow]{t('channel.quality_unavailable', '⚠️ Análisis científico no disponible')}[/yellow]")
+                analysis['quality_metrics'] = None
+            
+            progress.update(task2, completed=True)
         
-        # Mostrar resultados en tabla rica
+        # Mostrar resultados en tabla rica con métricas científicas
         display_channel_analysis(analysis)
         
     except Exception as e:
@@ -171,6 +214,10 @@ def display_channel_analysis(analysis: Dict[str, Any]):
         show_mono_analysis(analysis)
     else:
         show_stereo_analysis(analysis)
+    
+    # Mostrar métricas científicas de calidad
+    if analysis.get('quality_metrics'):
+        show_scientific_quality_metrics(analysis['quality_metrics'])
     
     # Mostrar recomendaciones
     if analysis.get('recommendations'):
@@ -380,6 +427,121 @@ def run_batch_channel_operations():
         
     except Exception as e:
         console.print(f"[red]{t('channel.batch_error', '❌ Error en conversión por lotes: {error}').format(error=str(e))}[/red]")
+
+def show_scientific_quality_metrics(quality_metrics: Dict[str, Any]):
+    """
+    Mostrar métricas científicas de calidad de audio
+    
+    Args:
+        quality_metrics: Diccionario con métricas de calidad por canal
+    """
+    console.print(f"\\n[bold magenta]{t('channel.scientific_metrics', '🔬 Métricas Científicas de Calidad')}:[/bold magenta]")
+    
+    # Crear tabla de métricas científicas
+    metrics_table = Table(
+        title=t('channel.scientific_table', 'Análisis de Calidad Profesional'), 
+        show_header=True, 
+        header_style="bold magenta"
+    )
+    metrics_table.add_column(t('channel.metric_type', 'Métrica'), style="white", width=20)
+    metrics_table.add_column(t('channel.metric_value', 'Valor'), style="cyan", width=15)
+    metrics_table.add_column(t('channel.metric_standard', 'Estándar'), style="green", width=15)
+    metrics_table.add_column(t('channel.metric_status', 'Estado'), style="bold", width=15)
+    
+    # Función helper para formatear estado de calidad
+    def format_quality_status(level):
+        if hasattr(level, 'value'):
+            level_str = level.value
+        else:
+            level_str = str(level).lower()
+            
+        emoji_map = {
+            'excellent': '🟢 Excelente',
+            'good': '🟡 Bueno',
+            'acceptable': '🟠 Aceptable', 
+            'poor': '🔴 Pobre',
+            'failed': '❌ Fallo'
+        }
+        return emoji_map.get(level_str, f'❓ {level_str}')
+    
+    # Mostrar métricas según el tipo de análisis
+    if 'overall' in quality_metrics:
+        # Análisis mono
+        metrics = quality_metrics['overall']
+        
+        if hasattr(metrics, 'thd_plus_n_db') and metrics.thd_plus_n_db is not None:
+            status = format_quality_status(metrics.overall_quality) if hasattr(metrics, 'overall_quality') else '❓ N/A'
+            metrics_table.add_row(
+                "THD+N", 
+                f"{metrics.thd_plus_n_db:.1f} dB",
+                "< -60dB (Prof)",
+                status
+            )
+        
+        if hasattr(metrics, 'snr_db') and metrics.snr_db is not None:
+            status = format_quality_status(metrics.overall_quality) if hasattr(metrics, 'overall_quality') else '❓ N/A'
+            metrics_table.add_row(
+                "SNR", 
+                f"{metrics.snr_db:.1f} dB",
+                "> 90dB (Prof)",
+                status
+            )
+        
+        if hasattr(metrics, 'dynamic_range_db') and metrics.dynamic_range_db is not None:
+            metrics_table.add_row(
+                "Rango Dinámico", 
+                f"{metrics.dynamic_range_db:.1f} dB",
+                "> 60dB",
+                "🟢 Bueno" if metrics.dynamic_range_db > 60 else "🟡 Aceptable"
+            )
+            
+    elif 'channel_0' in quality_metrics:
+        # Análisis multi-canal - mostrar resumen
+        console.print(f"[dim]{t('channel.multichannel_note', 'Análisis por canal individual:')}[/dim]")
+        
+        for channel_key, metrics in quality_metrics.items():
+            if channel_key.startswith('channel_'):
+                channel_num = channel_key.split('_')[1]
+                console.print(f"\\n[cyan]{t('channel.channel_analysis', 'Canal {num}:').format(num=channel_num)}[/cyan]")
+                
+                # Mini tabla por canal
+                if hasattr(metrics, 'thd_plus_n_db') and metrics.thd_plus_n_db is not None:
+                    status = format_quality_status(metrics.overall_quality) if hasattr(metrics, 'overall_quality') else '❓'
+                    console.print(f"  THD+N: {metrics.thd_plus_n_db:.1f} dB {status}")
+                
+                if hasattr(metrics, 'snr_db') and metrics.snr_db is not None:
+                    console.print(f"  SNR: {metrics.snr_db:.1f} dB")
+        
+        # Mostrar análisis del mix estéreo si está disponible
+        if 'stereo_mix' in quality_metrics:
+            metrics = quality_metrics['stereo_mix']
+            console.print(f"\\n[bold cyan]{t('channel.stereo_mix_analysis', '🎭 Análisis del Mix Estéreo:')}[/bold cyan]")
+            
+            if hasattr(metrics, 'thd_plus_n_db') and metrics.thd_plus_n_db is not None:
+                status = format_quality_status(metrics.overall_quality) if hasattr(metrics, 'overall_quality') else '❓ N/A'
+                metrics_table.add_row(
+                    "THD+N (Mix)", 
+                    f"{metrics.thd_plus_n_db:.1f} dB",
+                    "< -60dB",
+                    status
+                )
+            
+            if hasattr(metrics, 'snr_db') and metrics.snr_db is not None:
+                metrics_table.add_row(
+                    "SNR (Mix)", 
+                    f"{metrics.snr_db:.1f} dB", 
+                    "> 90dB",
+                    format_quality_status(metrics.overall_quality) if hasattr(metrics, 'overall_quality') else '❓'
+                )
+    
+    # Mostrar tabla solo si tiene contenido
+    if metrics_table.rows:
+        console.print(metrics_table)
+    else:
+        console.print(f"[yellow]{t('channel.no_scientific_data', '⚠️ No hay datos científicos disponibles')}[/yellow]")
+    
+    # Mostrar nota explicativa
+    console.print(f"\\n[dim]{t('channel.scientific_note', 'Nota: Estándares profesionales - THD+N <-60dB, SNR >90dB, Estudio: THD+N <-80dB, SNR >100dB')}[/dim]")
 
 # Entry point para testing
 if __name__ == "__main__":
