@@ -269,8 +269,10 @@ class SpectrogramGenerator:
             # Load audio
             self._progress_tracker.update(10, "Loading audio file")
             y, sr = self._load_audio(file_path)
-            
+
             # CQT parameters for musical analysis
+            if params is None:
+                params = {}
             fmin = params.get('fmin', librosa.note_to_hz('C1'))  # ~32.7 Hz
             n_bins = params.get('n_bins', 84)  # 7 octaves * 12 semitones
             bins_per_octave = params.get('bins_per_octave', 12)

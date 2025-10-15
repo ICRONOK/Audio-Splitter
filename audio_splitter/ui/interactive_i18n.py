@@ -23,6 +23,8 @@ from ..core.enhanced_spectrogram import EnhancedSpectrogramGenerator
 from ..config.quality_settings import get_quality_settings, QualityProfile
 from ..ui.cli import display_quality_metrics
 from ..ui.channel_interface import run_channel_converter
+from ..ui.workflow_interface import run_professional_workflows
+from ..ui.batch_interface import run_batch_processing
 
 console = Console()
 
@@ -53,16 +55,17 @@ def interactive_menu_i18n():
             f"4. {t('menu.spectrogram_generator', '📊 Spectrogram Generator - Generación de espectrogramas para LLMs')}",
             f"5. {t('menu.channel_converter', '🎧 Channel Converter - Conversión mono ↔ stereo')}",
             f"6. {t('menu.workflows', '🔄 Professional Workflows - Automatización de procesos')}",
-            f"7. {t('menu.artwork_manager', '🖼️  Artwork Manager - Gestión de carátulas')}",
-            f"8. {t('menu.quality_settings', '⚙️  Quality Settings - Configuración de calidad científica')}",
-            f"9. {t('menu.documentation', '📄 Documentación y ayuda')}",
-            f"10. {t('menu.exit', '🚪 Salir')}"
+            f"7. {t('menu.batch_processing', '📦 Batch Processing - Procesamiento masivo de archivos')}",
+            f"8. {t('menu.artwork_manager', '🖼️  Artwork Manager - Gestión de carátulas')}",
+            f"9. {t('menu.quality_settings', '⚙️  Quality Settings - Configuración de calidad científica')}",
+            f"10. {t('menu.documentation', '📄 Documentación y ayuda')}",
+            f"11. {t('menu.exit', '🚪 Salir')}"
         ]
-        
+
         for option in options:
             console.print(f"  {option}")
-        
-        choice = Prompt.ask(f"\\n{t('menu.select_module', 'Selecciona un módulo')}", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"])
+
+        choice = Prompt.ask(f"\\n{t('menu.select_module', 'Selecciona un módulo')}", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"])
         
         if choice == "1":
             run_audio_converter_i18n()
@@ -77,12 +80,14 @@ def interactive_menu_i18n():
         elif choice == "6":
             run_professional_workflows_i18n()
         elif choice == "7":
-            run_artwork_manager_i18n()
+            run_batch_processing_i18n()
         elif choice == "8":
-            run_quality_settings_i18n()
+            run_artwork_manager_i18n()
         elif choice == "9":
-            show_documentation_i18n()
+            run_quality_settings_i18n()
         elif choice == "10":
+            show_documentation_i18n()
+        elif choice == "11":
             console.print(f"\\n[yellow]{t('menu.goodbye', '👋 ¡Gracias por usar Audio Splitter Suite!')}[/yellow]")
             break
 
@@ -212,8 +217,26 @@ def run_spectrogram_generator_i18n():
     console.print(f"[yellow]{t('spectrogram.coming_soon', '📊 Spectrogram Generator multiidioma - Próximamente')}[/yellow]")
 
 def run_professional_workflows_i18n():
-    """Ejecuta Professional Workflows (Fase 2)"""
-    console.print(f"[yellow]{t('workflows.coming_soon', '🔄 Professional Workflows - Implementación en Fase 2')}[/yellow]")
+    """Ejecuta Professional Workflows con interfaz multiidioma"""
+    try:
+        console.print(f"\\n[bold green]✓ {t('workflows.title', '🔄 Professional Workflows')}[/bold green]")
+
+        # Ejecutar la interfaz de workflows
+        run_professional_workflows()
+
+    except Exception as e:
+        console.print(f"[red]{t('common.error', '❌ Error')}: {str(e)}[/red]")
+
+def run_batch_processing_i18n():
+    """Ejecuta Batch Processing con interfaz multiidioma"""
+    try:
+        console.print(f"\\n[bold green]✓ {t('batch.title', '📦 Batch Processing')}[/bold green]")
+
+        # Ejecutar la interfaz de batch processing
+        run_batch_processing()
+
+    except Exception as e:
+        console.print(f"[red]{t('common.error', '❌ Error')}: {str(e)}[/red]")
 
 def run_artwork_manager_i18n():
     """Ejecuta el Artwork Manager con interfaz multiidioma"""

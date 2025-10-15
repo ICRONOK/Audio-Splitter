@@ -21,6 +21,7 @@
     "spectrogram_generator": "📊 Spectrogram Generator - Generación de espectrogramas para LLMs",
     "channel_converter": "🎧 Channel Converter - Conversión mono ↔ stereo",
     "workflows": "🔄 Professional Workflows - Automatización de procesos",
+    "batch_processing": "📦 Batch Processing - Procesamiento masivo de archivos",
     "artwork_manager": "🖼️  Artwork Manager - Gestión de carátulas",
     "quality_settings": "⚙️  Quality Settings - Configuración de calidad científica",
     "documentation": "📄 Documentación y ayuda",
@@ -318,7 +319,12 @@
     "progress_format": "Progreso: {current}/{total} - {message}"
   },
   "workflows": {
+    "title": "🔄 Professional Workflows",
     "coming_soon": "🔄 Professional Workflows - Implementación en Fase 2"
+  },
+  "batch": {
+    "title": "📦 Batch Processing",
+    "batch_processing": "📦 Batch Processing - Procesamiento masivo de archivos"
   },
   "artwork": {
     "coming_soon": "🖼️ Artwork Manager multiidioma - Próximamente"

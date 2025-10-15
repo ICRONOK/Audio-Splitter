@@ -239,7 +239,7 @@ class MetadataEditor:
             if success:
                 audio_file.save()
                 return True
-            
+
             return False
             
         except Exception as e:
@@ -324,17 +324,23 @@ class MetadataEditor:
         try:
             # Intentar agregar tags ID3 al archivo WAV/AIFF
             if audio_file.tags is None:
-                audio_file.add_tags()
-            
+                try:
+                    audio_file.add_tags()
+                except Exception:
+                    pass  # Puede fallar si ya existen tags vacíos
+
+            # Verificar que tags no sea None
+            if audio_file.tags is None:
+                # WAV/AIFF tiene soporte limitado de metadatos
+                return False
+
             tags = audio_file.tags
-            
+
             # Usar la misma lógica que para MP3
             return self._write_id3_tags_direct(tags, metadata)
-            
+
         except Exception as e:
             console.print(f"[red]Error escribiendo tags ID3 a {type(audio_file).__name__}: {e}[/red]")
-            console.print(f"[yellow]Nota: Los archivos {type(audio_file).__name__} tienen soporte limitado para metadatos[/yellow]")
-            console.print(f"[yellow]Considera convertir a MP3 o FLAC para mejor soporte de metadatos[/yellow]")
             return False
     
     def _write_id3_tags_direct(self, tags, metadata: AudioMetadata) -> bool:
@@ -407,57 +413,64 @@ class MetadataEditor:
     def _write_vorbis_tags(self, audio_file: FLAC, metadata: AudioMetadata) -> bool:
         """Escribe Vorbis Comments a archivos FLAC"""
         try:
+            # Intentar add_tags (puede fallar si ya existen tags vacíos, pero no importa)
+            try:
+                audio_file.add_tags()
+            except:
+                pass  # Ya existen tags, continuar
+
             # Limpiar tags existentes
-            if audio_file.tags:
-                audio_file.tags.clear()
-            else:
-                audio_file.tags = VCommentDict()
-            
-            tags = audio_file.tags
-            
-            # Escribir tags
+            existing_keys = list(audio_file.keys()) if audio_file.tags else []
+            for key in existing_keys:
+                try:
+                    del audio_file[key]
+                except:
+                    pass
+
+            # Escribir tags usando notación directa audio_file['KEY']
+            # Esta es la forma correcta que funciona con FLAC
             if metadata.title:
-                tags['TITLE'] = metadata.title
+                audio_file['TITLE'] = metadata.title
             if metadata.artist:
-                tags['ARTIST'] = metadata.artist
+                audio_file['ARTIST'] = metadata.artist
             if metadata.album:
-                tags['ALBUM'] = metadata.album
+                audio_file['ALBUM'] = metadata.album
             if metadata.albumartist:
-                tags['ALBUMARTIST'] = metadata.albumartist
+                audio_file['ALBUMARTIST'] = metadata.albumartist
             if metadata.date:
-                tags['DATE'] = metadata.date
+                audio_file['DATE'] = metadata.date
             if metadata.genre:
-                tags['GENRE'] = metadata.genre
+                audio_file['GENRE'] = metadata.genre
             if metadata.composer:
-                tags['COMPOSER'] = metadata.composer
+                audio_file['COMPOSER'] = metadata.composer
             if metadata.comment:
-                tags['COMMENT'] = metadata.comment
+                audio_file['COMMENT'] = metadata.comment
             if metadata.track:
-                tags['TRACKNUMBER'] = metadata.track
+                audio_file['TRACKNUMBER'] = metadata.track
             if metadata.track_total:
-                tags['TRACKTOTAL'] = metadata.track_total
+                audio_file['TRACKTOTAL'] = metadata.track_total
             if metadata.disc:
-                tags['DISCNUMBER'] = metadata.disc
+                audio_file['DISCNUMBER'] = metadata.disc
             if metadata.disc_total:
-                tags['DISCTOTAL'] = metadata.disc_total
-            
+                audio_file['DISCTOTAL'] = metadata.disc_total
+
             # Artwork
             if metadata.artwork_data:
                 # Limpiar imágenes existentes
                 audio_file.clear_pictures()
-                
+
                 # Crear objeto Picture
                 pic = Picture()
                 pic.type = 3  # Cover (front)
                 pic.mime = metadata.artwork_mime or 'image/jpeg'
                 pic.desc = metadata.artwork_description or 'Cover'
                 pic.data = metadata.artwork_data
-                
+
                 # Agregar al archivo
                 audio_file.add_picture(pic)
-            
+
             return True
-            
+
         except Exception as e:
             console.print(f"[red]Error escribiendo tags Vorbis: {e}[/red]")
             return False
