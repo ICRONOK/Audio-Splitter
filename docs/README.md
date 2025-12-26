@@ -129,10 +129,8 @@ Editor completo con soporte para todos los estándares de metadatos.
 ```
 
 **Funciones Avanzadas:**
-- 📋 **Plantillas**: Guardar y aplicar conjuntos de metadatos
-- 🔄 **Edición por Lotes**: Actualizar múltiples archivos
-- ✅ **Validación**: Verificación automática de datos
-- 🖼️ **Gestión de Carátulas**: Ver, extraer, agregar, redimensionar
+- 📋 **Plantillas**: Guardar y aplicar conjuntos de metadatos (en desarrollo)
+- 🖼️ **Carátulas**: Agregar/cambiar artwork durante edición individual
 
 **Uso:**
 
@@ -150,26 +148,6 @@ python3 metadata_editor.py --file song.mp3 --field "album=Mi Álbum" --field "ye
 python3 metadata_editor.py --file song.mp3 --artwork cover.jpg
 ```
 
-### 4. 🖼️ Artwork Manager
-
-Gestión profesional de carátulas integrada en el editor de metadatos.
-
-**Características:**
-- **Formatos**: JPEG, PNG con conversión automática
-- **Embedding**: Inserción en MP3, FLAC, M4A
-- **Extracción**: Guardar carátulas existentes
-- **Redimensionado**: Automático a tamaños estándar
-- **Batch Processing**: Aplicar a múltiples archivos
-
-**Tamaños Estándar:**
-```
-🖼️ Thumbnail: 300x300 (para previews)
-📱 Pequeño: 500x500 (streaming)
-💽 Medio: 800x800 (estándar)
-🎨 Grande: 1200x1200 (archivo)
-⚙️ Personalizado: Tamaño definido por usuario
-```
-
 ## 🎛️ Menú Principal Unificado
 
 El sistema incluye un menú principal que integra todos los módulos:
@@ -185,10 +163,9 @@ python3 main.py
 🎛️ Módulos disponibles:
   1. 🔄 Audio Converter - Conversión entre formatos
   2. ✂️  Audio Splitter - División en segmentos
-  3. 🏷️  Metadata Editor - Editor profesional
-  4. 🖼️  Artwork Manager - Gestión de carátulas
-  5. 📄 Documentación y ayuda
-  6. 🚪 Salir
+  3. 🏷️  Metadata Editor - Editor profesional (incluye carátulas)
+  4. 📄 Documentación y ayuda
+  5. 🚪 Salir
 ```
 
 ## 📋 Workflows Típicos

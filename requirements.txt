@@ -10,9 +10,12 @@ eyed3>=0.9.7             # Metadatos ID3 avanzados
 tinytag>=1.10.0          # Lectura rápida de metadatos
 ffmpeg-python>=0.2.0     # Conversión entre formatos
 
-# Manejo de imágenes para carátulas
+# Manejo de imágenes para carátulas y espectrogramas
 Pillow>=10.0.0           # Procesamiento de imágenes
 requests>=2.28.0         # Para descargar carátulas online
+matplotlib>=3.7.0        # Generación de espectrogramas para LLM context
+opencv-python>=4.8.0     # Computer vision para optimización LLM
+seaborn>=0.12.0          # Visualización científica avanzada
 
 # Interfaz de usuario
 rich>=13.0.0             # Terminal UI mejorada
