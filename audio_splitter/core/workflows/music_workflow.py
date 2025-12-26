@@ -1,116 +1,42 @@
 #!/usr/bin/env python3
 """
 Professional Music Mastering Workflow
-Workflow automatizado para mastering de música profesional
+Multi-format mastering for music distribution and archiving
 
-Pipeline:
-1. Channel Conversion - Conversión mono ↔ stereo (opcional)
-2. Convert to FLAC - Formato lossless de alta calidad
-3. Validate Quality - Validación científica (THD+N, SNR)
-4. Convert to MP3 - Versión comprimida para distribución
-5. Add Metadata - Información del track
-6. Generate Spectrogram - Análisis visual de frecuencias
+Real-world pipeline:
+1. Pre-Master Quality Analysis - Scientific validation
+2. Archive Master (FLAC) - Lossless archival format
+3. Distribution Master (MP3) - Streaming-optimized format
+4. Add Music Metadata - Complete track information
+5. Frequency Analysis - Dual spectrogram analysis
+6. Post-Master Validation - Quality comparison
 """
 
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 # Imports relativos con fallback
 try:
-    from ..workflow_engine import WorkflowEngine, create_workflow, WorkflowStep, WorkflowContext
+    from ..workflow_engine import WorkflowEngine, create_workflow
     from ..workflow_steps import (
         ConvertAudioStep,
         AddMetadataStep,
         GenerateSpectrogramStep,
-        ValidateQualityStep
+        ValidateQualityStep,
+        ChannelConversionStep
     )
-    from ..converter import AudioConverter
 except ImportError:
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from audio_splitter.core.workflow_engine import WorkflowEngine, create_workflow, WorkflowStep, WorkflowContext
+    from audio_splitter.core.workflow_engine import WorkflowEngine, create_workflow
     from audio_splitter.core.workflow_steps import (
         ConvertAudioStep,
         AddMetadataStep,
         GenerateSpectrogramStep,
-        ValidateQualityStep
+        ValidateQualityStep,
+        ChannelConversionStep
     )
-    from audio_splitter.core.converter import AudioConverter
-
-from rich.console import Console
-console = Console()
-
-
-class ChannelConversionStep(WorkflowStep):
-    """
-    Step para conversión de canales (mono ↔ stereo)
-    """
-
-    def __init__(self,
-                 target_channels: int,
-                 mixing_algorithm: str = "downmix_center",
-                 preserve_metadata: bool = True,
-                 name: Optional[str] = None):
-        channel_name = "mono" if target_channels == 1 else "stereo"
-        name = name or f"Convert to {channel_name.capitalize()}"
-        super().__init__(
-            name=name,
-            description=f"Convertir audio a {channel_name}",
-            required=False  # Opcional
-        )
-        self.target_channels = target_channels
-        self.mixing_algorithm = mixing_algorithm
-        self.preserve_metadata = preserve_metadata
-        self.converter = AudioConverter()
-
-    def validate_preconditions(self, context: WorkflowContext) -> bool:
-        """Validar que existe archivo de entrada"""
-        if not context.input_file:
-            return False
-        return Path(context.input_file).exists()
-
-    def execute(self, context: WorkflowContext) -> Dict[str, Any]:
-        """Ejecutar conversión de canales"""
-        input_file = context.input_file
-        output_dir = Path(context.output_dir or ".")
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Generar nombre de archivo de salida
-        input_path = Path(input_file)
-        channel_suffix = "mono" if self.target_channels == 1 else "stereo"
-        output_file = output_dir / f"{input_path.stem}_{channel_suffix}{input_path.suffix}"
-
-        console.print(f"[cyan]Converting channels to {channel_suffix}...[/cyan]")
-
-        # Ejecutar conversión usando AudioConverter
-        success = self.converter.convert_channels(
-            input_path=str(input_file),
-            output_path=str(output_file),
-            target_channels=self.target_channels,
-            mixing_algorithm=self.mixing_algorithm if self.target_channels == 1 else "downmix_center",
-            preserve_metadata=self.preserve_metadata
-        )
-
-        if success:
-            # Registrar archivo generado y actualizar input para siguientes steps
-            context.add_intermediate_file('channel_converted', str(output_file))
-            # IMPORTANTE: Actualizar input_file para que siguientes steps usen el archivo convertido
-            context.input_file = str(output_file)
-            console.print(f"[green]✓ Channel conversion successful: {output_file}[/green]")
-
-            return {
-                'output_file': str(output_file),
-                'target_channels': self.target_channels,
-                'algorithm': self.mixing_algorithm
-            }
-        else:
-            from ..workflow_engine import WorkflowError
-            raise WorkflowError(f"Channel conversion failed")
-
-    def validate_postconditions(self, context: WorkflowContext) -> bool:
-        """Validar que el archivo convertido existe"""
-        output_file = context.get_intermediate_file('channel_converted')
-        return output_file and Path(output_file).exists()
 
 
 def create_music_mastering_workflow(
@@ -118,47 +44,59 @@ def create_music_mastering_workflow(
     output_dir: str,
     metadata: Optional[Dict[str, str]] = None,
     quality_profile: str = "professional",
-    channel_conversion: Optional[str] = None,  # "mono", "stereo", o None
+    channel_conversion: Optional[str] = None,
     mixing_algorithm: str = "downmix_center",
     include_flac: bool = True,
     include_mp3: bool = True,
     generate_analysis: bool = True
 ) -> WorkflowEngine:
     """
-    Crear workflow de mastering de música profesional
+    Professional music mastering workflow for distribution
+
+    Creates multiple format masters with scientific quality validation
 
     Args:
-        input_file: Archivo de audio master
-        output_dir: Directorio para archivos procesados
-        metadata: Metadatos del track (title, artist, album, etc.)
-        quality_profile: Perfil de calidad (professional, studio)
-        channel_conversion: Conversión de canales ("mono", "stereo", o None para mantener original)
-        mixing_algorithm: Algoritmo para downmix stereo→mono (downmix_center, left_only, right_only, average)
-        include_flac: Si incluir versión FLAC lossless
-        include_mp3: Si incluir versión MP3 para distribución
-        generate_analysis: Si generar espectrogramas de análisis
+        input_file: Final mix audio file (WAV, FLAC, etc.)
+        output_dir: Output directory for master files
+        metadata: Track metadata (title, artist, album, etc.)
+        quality_profile: Quality profile (professional, studio)
+        channel_conversion: Channel conversion ("mono", "stereo", None to keep original)
+        mixing_algorithm: Algorithm for stereo→mono (downmix_center, left_only, right_only, average)
+        include_flac: Generate FLAC lossless archive master
+        include_mp3: Generate MP3 distribution master
+        generate_analysis: Generate frequency analysis spectrograms
 
     Returns:
-        WorkflowEngine configurado con pipeline de mastering
+        WorkflowEngine configured with mastering pipeline
+
+    Pipeline:
+        1. Pre-Master Quality Analysis - THD+N, SNR, artifact detection
+        1.5. [OPTIONAL] Channel Conversion - Mono ↔ Stereo
+        2. Archive Master (FLAC) - Lossless with quality validation
+        3. Distribution Master (MP3 320kbps) - Streaming-optimized
+        4. Add Complete Metadata - Album, artist, ISRC, production credits
+        5. Frequency Analysis - Dual spectrogram (mel + CQT)
+        6. Post-Master Validation - Format comparison and quality check
     """
 
-    # Metadatos por defecto
+    # Default metadata
     if metadata is None:
         metadata = {
             'title': 'Untitled Track',
             'artist': 'Unknown Artist',
             'album': 'Single',
-            'date': '2025',
-            'genre': 'Music'
+            'genre': 'Music',
+            'date': str(datetime.now().year),
+            'comment': 'Mastered with Audio Splitter Suite'
         }
 
-    # Crear workflow
+    # Create workflow
     workflow = create_workflow(
-        name="Professional Music Mastering",
-        description="Pipeline automatizado para mastering profesional de música"
+        name="Music Mastering",
+        description="Professional music mastering and distribution preparation"
     )
 
-    # Configurar contexto
+    # Configure context
     workflow.configure(
         input_file=input_file,
         output_dir=output_dir,
@@ -166,7 +104,16 @@ def create_music_mastering_workflow(
         quality_profile=quality_profile
     )
 
-    # Step 0: Channel Conversion (OPCIONAL - Si se especifica)
+    # Step 1: Pre-Master Quality Analysis
+    workflow.add_step(
+        ValidateQualityStep(
+            name="Pre-Master Quality Analysis",
+            strict=True,
+            profile=quality_profile
+        )
+    )
+
+    # Step 1.5: Channel Conversion (OPTIONAL)
     if channel_conversion:
         target_channels = 1 if channel_conversion.lower() == "mono" else 2
         workflow.add_step(
@@ -178,47 +125,42 @@ def create_music_mastering_workflow(
             )
         )
 
-    # Step 1: Convert to FLAC (formato lossless master)
+    # Step 2: Archive Master (FLAC Lossless)
     if include_flac:
         workflow.add_step(
             ConvertAudioStep(
                 output_format="flac",
-                quality_level="high",  # Compression level 8 (máxima calidad)
-                quality_validation=True,  # Siempre validar FLAC master
-                name="Convert to FLAC Master"
+                bitrate=None,  # Lossless
+                quality_level="lossless",
+                quality_validation=True,
+                name="Create Archive Master (FLAC)"
             )
         )
 
-        # Validate FLAC master quality
-        workflow.add_step(
-            ValidateQualityStep(
-                name="Validate FLAC Master Quality"
-            )
-        )
-
-    # Step 2: Convert to MP3 (distribución)
+    # Step 3: Distribution Master (MP3 320kbps)
     if include_mp3:
         workflow.add_step(
             ConvertAudioStep(
                 output_format="mp3",
-                quality_level="high",  # VBR high o 320kbps
+                bitrate="320k",
+                quality_level="high",
                 quality_validation=True,
-                name="Convert to MP3 Distribution"
+                name="Create Distribution Master (MP3 320kbps)"
             )
         )
 
-    # Step 3: Add Metadata
+    # Step 4: Add Music Metadata
     workflow.add_step(
         AddMetadataStep(
             metadata=metadata,
-            target="converted",
-            name="Add Track Metadata"
+            target="all",  # Apply to all formats
+            name="Add Music Metadata"
         )
     )
 
-    # Step 4: Generate Spectrograms para análisis
+    # Step 5: Frequency Analysis (Mel + CQT Spectrograms)
     if generate_analysis:
-        # Mel spectrogram para análisis general
+        # Mel spectrogram for general frequency analysis
         workflow.add_step(
             GenerateSpectrogramStep(
                 spectrogram_type="mel",
@@ -226,54 +168,57 @@ def create_music_mastering_workflow(
                 name="Generate Mel Spectrogram"
             )
         )
-
-        # CQT spectrogram para análisis musical detallado (opcional)
+        # CQT spectrogram for musical analysis
         workflow.add_step(
             GenerateSpectrogramStep(
                 spectrogram_type="cqt",
                 enhanced=True,
-                name="Generate CQT Musical Analysis"
+                name="Generate CQT Spectrogram (Musical Analysis)"
             )
         )
 
-    # Step 5: Final Quality Validation
+    # Step 6: Post-Master Quality Validation
     workflow.add_step(
         ValidateQualityStep(
-            name="Final Master Quality Validation"
+            name="Post-Master Quality Validation",
+            strict=False,  # Warning only
+            compare_formats=True  # Compare FLAC vs MP3
         )
     )
 
     return workflow
 
 
-def create_quick_music_workflow(
+def create_quick_mastering_workflow(
     input_file: str,
     output_dir: str,
     track_title: str,
     artist_name: str,
-    album_name: str,
-    to_mono: bool = False
+    album_name: str
 ) -> WorkflowEngine:
     """
-    Versión rápida del workflow de mastering
+    Quick mastering workflow - MP3 only with basic metadata
+
+    Fast conversion for demos, previews, or quick distribution
 
     Args:
-        input_file: Archivo de audio
-        output_dir: Directorio de salida
-        track_title: Título del track
-        artist_name: Nombre del artista
-        album_name: Nombre del álbum
-        to_mono: Si convertir a mono para distribución específica
+        input_file: Audio file to master
+        output_dir: Output directory
+        track_title: Track title
+        artist_name: Artist name
+        album_name: Album name
 
     Returns:
-        WorkflowEngine configurado
+        WorkflowEngine with quick mastering pipeline
     """
 
     metadata = {
         'title': track_title,
         'artist': artist_name,
         'album': album_name,
-        'comment': 'Mastered with Audio Splitter Suite'
+        'genre': 'Music',
+        'date': str(datetime.now().year),
+        'comment': 'Quick master'
     }
 
     return create_music_mastering_workflow(
@@ -281,85 +226,72 @@ def create_quick_music_workflow(
         output_dir=output_dir,
         metadata=metadata,
         quality_profile="professional",
-        channel_conversion="mono" if to_mono else None,
-        include_flac=False,  # Solo MP3 para workflow rápido
+        include_flac=False,  # MP3 only for speed
         include_mp3=True,
         generate_analysis=False
     )
 
 
-def create_studio_mastering_workflow(
+def create_professional_mastering_workflow(
     input_file: str,
     output_dir: str,
-    metadata: Dict[str, str],
-    channel_mode: Optional[str] = None,
-    isrc: Optional[str] = None
+    track_title: str,
+    artist_name: str,
+    album_name: str,
+    track_number: int,
+    total_tracks: int,
+    genre: str,
+    channel_conversion: Optional[str] = None,
+    mixing_algorithm: str = "downmix_center",
+    isrc: Optional[str] = None,
+    production_credits: Optional[str] = None
 ) -> WorkflowEngine:
     """
-    Versión studio-grade del workflow con máxima calidad
+    Professional mastering workflow with complete metadata
+
+    Full quality validation and complete production information
 
     Args:
-        input_file: Archivo de audio master
-        output_dir: Directorio de salida
-        metadata: Metadatos completos del track
-        channel_mode: "mono", "stereo", o None (mantener original)
+        input_file: Audio file to master
+        output_dir: Output directory
+        track_title: Track title
+        artist_name: Artist name
+        album_name: Album name
+        track_number: Track number in album
+        total_tracks: Total tracks in album
+        genre: Music genre
+        channel_conversion: Channel conversion (None, "mono", "stereo")
+        mixing_algorithm: Mixing algorithm for stereo→mono
         isrc: International Standard Recording Code
+        production_credits: Producer, engineer, studio info
 
     Returns:
-        WorkflowEngine configurado con estándares de estudio
+        WorkflowEngine with professional mastering pipeline
     """
 
-    # Agregar ISRC si existe
-    if isrc:
-        metadata['isrc'] = isrc
+    # Build complete metadata
+    metadata = {
+        'title': track_title,
+        'artist': artist_name,
+        'album': album_name,
+        'genre': genre,
+        'date': str(datetime.now().year),
+        'track': f'{track_number}/{total_tracks}',
+        'comment': f'Track {track_number} of {total_tracks}'
+    }
 
-    metadata['quality_profile'] = 'studio'
-    metadata['mastered_by'] = 'Audio Splitter Suite - Studio Workflow'
+    if isrc:
+        metadata['comment'] += f'\nISRC: {isrc}'
+
+    if production_credits:
+        metadata['comment'] += f'\n{production_credits}'
 
     return create_music_mastering_workflow(
         input_file=input_file,
         output_dir=output_dir,
         metadata=metadata,
         quality_profile="studio",
-        channel_conversion=channel_mode,
-        mixing_algorithm="downmix_center",  # Algoritmo profesional por defecto
-        include_flac=True,   # FLAC master obligatorio
-        include_mp3=True,    # MP3 para distribución
-        generate_analysis=True  # Análisis completo
-    )
-
-
-def create_mono_mastering_workflow(
-    input_file: str,
-    output_dir: str,
-    metadata: Dict[str, str],
-    mixing_algorithm: str = "downmix_center"
-) -> WorkflowEngine:
-    """
-    Workflow específico para mastering mono (podcasts, radio, audiobooks)
-
-    Args:
-        input_file: Archivo de audio
-        output_dir: Directorio de salida
-        metadata: Metadatos del track
-        mixing_algorithm: Algoritmo de downmix (downmix_center, left_only, right_only, average)
-
-    Returns:
-        WorkflowEngine configurado para mono
-    """
-
-    # Agregar información de canales al comentario
-    if 'comment' in metadata:
-        metadata['comment'] = f"{metadata['comment']} | Channels: 1 (Mono) | Type: Mono Master"
-    else:
-        metadata['comment'] = 'Channels: 1 (Mono) | Type: Mono Master'
-
-    return create_music_mastering_workflow(
-        input_file=input_file,
-        output_dir=output_dir,
-        metadata=metadata,
-        quality_profile="professional",
-        channel_conversion="mono",
+        channel_conversion=channel_conversion,
         mixing_algorithm=mixing_algorithm,
         include_flac=True,
         include_mp3=True,
@@ -367,109 +299,243 @@ def create_mono_mastering_workflow(
     )
 
 
-def create_stereo_upmix_workflow(
+def create_album_mastering_workflow(
+    input_file: str,
+    output_dir: str,
+    metadata: Dict[str, str],
+    quality_profile: str = "studio"
+) -> WorkflowEngine:
+    """
+    Album mastering workflow - highest quality for album releases
+
+    Complete validation and analysis for album production
+
+    Args:
+        input_file: Audio file to master
+        output_dir: Output directory
+        metadata: Complete track metadata
+        quality_profile: Quality profile (studio recommended)
+
+    Returns:
+        WorkflowEngine with album mastering pipeline
+    """
+
+    # Ensure album metadata is complete
+    if 'comment' not in metadata:
+        metadata['comment'] = 'Album Master'
+
+    metadata['comment'] = f"{metadata.get('comment', 'Album Master')}\nMastered for album release"
+
+    return create_music_mastering_workflow(
+        input_file=input_file,
+        output_dir=output_dir,
+        metadata=metadata,
+        quality_profile=quality_profile,
+        include_flac=True,  # Always include FLAC for albums
+        include_mp3=True,
+        generate_analysis=True  # Full frequency analysis
+    )
+
+
+def create_streaming_optimized_workflow(
     input_file: str,
     output_dir: str,
     metadata: Dict[str, str]
 ) -> WorkflowEngine:
     """
-    Workflow para convertir mono a stereo
+    Streaming-optimized workflow for Spotify, Apple Music, etc.
+
+    MP3 320kbps with quality validation, no FLAC
 
     Args:
-        input_file: Archivo de audio mono
-        output_dir: Directorio de salida
-        metadata: Metadatos del track
+        input_file: Audio file to master
+        output_dir: Output directory
+        metadata: Track metadata
 
     Returns:
-        WorkflowEngine configurado para upmix stereo
+        WorkflowEngine with streaming-optimized pipeline
     """
 
-    # Agregar información de canales al comentario
-    if 'comment' in metadata:
-        metadata['comment'] = f"{metadata['comment']} | Channels: 2 (Stereo) | Type: Stereo Upmix"
-    else:
-        metadata['comment'] = 'Channels: 2 (Stereo) | Type: Stereo Upmix'
+    metadata['comment'] = f"{metadata.get('comment', 'Streaming Master')}\nOptimized for streaming platforms"
 
     return create_music_mastering_workflow(
         input_file=input_file,
         output_dir=output_dir,
         metadata=metadata,
         quality_profile="professional",
-        channel_conversion="stereo",
-        include_flac=True,
+        include_flac=False,  # No FLAC for streaming only
         include_mp3=True,
-        generate_analysis=True
+        generate_analysis=False  # Speed over analysis
     )
 
 
-# Templates y configuraciones predefinidas
-MASTERING_TEMPLATES = {
-    'single_release': {
-        'include_flac': True,
-        'include_mp3': True,
-        'channel_conversion': None,
-        'generate_analysis': True,
-        'quality_profile': 'professional',
-        'description': 'Master para single release (mantiene canales originales)'
-    },
-    'streaming_optimized': {
+def create_vinyl_preparation_workflow(
+    input_file: str,
+    output_dir: str,
+    metadata: Dict[str, str]
+) -> WorkflowEngine:
+    """
+    Vinyl preparation workflow for cutting master
+
+    Stereo-only FLAC with strictest quality validation
+
+    Args:
+        input_file: Audio file to master
+        output_dir: Output directory
+        metadata: Track metadata
+
+    Returns:
+        WorkflowEngine with vinyl preparation pipeline
+    """
+
+    metadata['comment'] = f"{metadata.get('comment', 'Vinyl Master')}\nPrepared for vinyl cutting | Stereo Required"
+
+    return create_music_mastering_workflow(
+        input_file=input_file,
+        output_dir=output_dir,
+        metadata=metadata,
+        quality_profile="studio",  # Strictest validation
+        channel_conversion="stereo",  # Vinyl requires stereo
+        mixing_algorithm="average",
+        include_flac=True,
+        include_mp3=False,  # No lossy compression for vinyl
+        generate_analysis=True  # Full frequency analysis required
+    )
+
+
+def create_broadcast_mastering_workflow(
+    input_file: str,
+    output_dir: str,
+    metadata: Dict[str, str],
+    mixing_algorithm: str = "downmix_center"
+) -> WorkflowEngine:
+    """
+    Broadcast mastering workflow for radio distribution
+
+    Mono-only MP3 optimized for AM/FM broadcast
+
+    Args:
+        input_file: Audio file to master
+        output_dir: Output directory
+        metadata: Track metadata
+        mixing_algorithm: Algorithm for stereo→mono conversion
+
+    Returns:
+        WorkflowEngine with broadcast mastering pipeline
+    """
+
+    metadata['comment'] = f"{metadata.get('comment', 'Broadcast Master')}\nOptimized for radio broadcast | Mono"
+
+    return create_music_mastering_workflow(
+        input_file=input_file,
+        output_dir=output_dir,
+        metadata=metadata,
+        quality_profile="professional",
+        channel_conversion="mono",  # Broadcast requires mono
+        mixing_algorithm=mixing_algorithm,
+        include_flac=False,
+        include_mp3=True,  # MP3 192kbps for broadcast
+        generate_analysis=False  # Speed over analysis
+    )
+
+
+def create_mono_compatibility_workflow(
+    input_file: str,
+    output_dir: str,
+    metadata: Dict[str, str]
+) -> WorkflowEngine:
+    """
+    Mono compatibility testing workflow
+
+    Creates mono version for compatibility testing (clubs, phones, mono speakers)
+
+    Args:
+        input_file: Audio file to test
+        output_dir: Output directory
+        metadata: Track metadata
+
+    Returns:
+        WorkflowEngine with mono compatibility test pipeline
+    """
+
+    metadata['comment'] = f"{metadata.get('comment', 'Mono Compatibility Test')}\nMono version for testing"
+
+    return create_music_mastering_workflow(
+        input_file=input_file,
+        output_dir=output_dir,
+        metadata=metadata,
+        quality_profile="professional",
+        channel_conversion="mono",  # Create mono version
+        mixing_algorithm="downmix_center",
+        include_flac=True,  # Keep high quality for analysis
+        include_mp3=False,
+        generate_analysis=True  # Compare frequency response
+    )
+
+
+# Workflow modes for UI
+MASTERING_MODES = {
+    'quick': {
+        'name': 'Quick Mastering',
+        'description': 'Fast MP3 conversion with basic metadata',
         'include_flac': False,
         'include_mp3': True,
-        'channel_conversion': None,
         'generate_analysis': False,
-        'quality_profile': 'professional',
-        'description': 'Optimizado para plataformas streaming'
+        'quality_profile': 'professional'
     },
-    'vinyl_master': {
+    'standard': {
+        'name': 'Standard Mastering',
+        'description': 'FLAC + MP3 with quality validation',
+        'include_flac': True,
+        'include_mp3': True,
+        'generate_analysis': False,
+        'quality_profile': 'professional'
+    },
+    'professional': {
+        'name': 'Professional Mastering',
+        'description': 'Full validation with frequency analysis',
+        'include_flac': True,
+        'include_mp3': True,
+        'generate_analysis': True,
+        'quality_profile': 'studio'
+    },
+    'streaming': {
+        'name': 'Streaming Optimized',
+        'description': 'MP3 320kbps for streaming platforms',
+        'include_flac': False,
+        'include_mp3': True,
+        'generate_analysis': False,
+        'quality_profile': 'professional'
+    },
+    'vinyl': {
+        'name': 'Vinyl Preparation',
+        'description': 'FLAC lossless for vinyl cutting',
         'include_flac': True,
         'include_mp3': False,
-        'channel_conversion': 'stereo',
         'generate_analysis': True,
-        'quality_profile': 'studio',
-        'description': 'Master para producción de vinilo (stereo obligatorio)'
-    },
-    'digital_distribution': {
-        'include_flac': True,
-        'include_mp3': True,
-        'channel_conversion': None,
-        'generate_analysis': True,
-        'quality_profile': 'professional',
-        'description': 'Master para distribución digital (iTunes, Spotify, etc.)'
-    },
-    'mono_radio': {
-        'include_flac': False,
-        'include_mp3': True,
-        'channel_conversion': 'mono',
-        'generate_analysis': False,
-        'quality_profile': 'professional',
-        'description': 'Master mono para radio y broadcast'
-    },
-    'audiobook': {
-        'include_flac': False,
-        'include_mp3': True,
-        'channel_conversion': 'mono',
-        'generate_analysis': False,
-        'quality_profile': 'professional',
-        'description': 'Master mono para audiobooks'
+        'quality_profile': 'studio'
     }
 }
 
 
-def get_mastering_template(template_name: str) -> Dict[str, Any]:
+def get_mastering_mode(mode_name: str) -> Dict[str, Any]:
     """
-    Obtener template predefinido de mastering
+    Get mastering workflow mode configuration
 
     Args:
-        template_name: Nombre del template
+        mode_name: Mode name (quick, standard, professional, streaming, vinyl)
 
     Returns:
-        Dict con configuración del template
+        Mode configuration dict
     """
-    return MASTERING_TEMPLATES.get(template_name, MASTERING_TEMPLATES['single_release'])
+    return MASTERING_MODES.get(mode_name, MASTERING_MODES['standard'])
 
 
 if __name__ == "__main__":
-    console.print("[cyan]Music Mastering Workflow Module Loaded[/cyan]")
-    console.print(f"Available templates: {list(MASTERING_TEMPLATES.keys())}")
-    console.print("✅ Professional Music Mastering workflow ready")
-    console.print("✅ Channel conversion (mono ↔ stereo) integrated")
+    from rich.console import Console
+    console = Console()
+
+    console.print("[cyan]Professional Music Mastering Workflow Loaded[/cyan]")
+    console.print(f"Available modes: {list(MASTERING_MODES.keys())}")
+    console.print("✅ Multi-format mastering pipeline ready")
+    console.print("✅ FLAC (lossless archive) + MP3 (distribution) support")

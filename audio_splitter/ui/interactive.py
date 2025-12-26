@@ -516,35 +516,21 @@ def run_audio_splitter():
                 quality_validation=quality_validation
             )
             
-            if result['status'] == 'success':
+            # Check if splitting was successful
+            if result.get('success', True) and result.get('segments_failed', 0) == 0:
                 console.print(f"[green]✓ División mejorada completada en '{output_dir}'[/green]")
-                
-                # Mostrar estadísticas de rendimiento
-                if 'performance_stats' in result:
-                    stats = result['performance_stats']
-                    console.print(f"[dim]Procesados: {stats.get('total_segments', len(segments))} segmentos | "
-                               f"Tiempo: {stats.get('total_time_ms', 0):.0f}ms | "
-                               f"Memoria: {stats.get('peak_memory_mb', 0):.1f}MB[/dim]")
-                
-                # Mostrar métricas de calidad si se solicitó
-                if show_metrics and 'segment_quality_metrics' in result:
-                    console.print("\n[bold cyan]📊 Métricas de Calidad por Segmento:[/bold cyan]")
-                    
-                    for i, metrics in enumerate(result['segment_quality_metrics']):
-                        segment_name = segments[i][2] if segments[i][2] else f"segmento_{i+1}"
-                        console.print(f"\n[bold white]{segment_name}:[/bold white]")
-                        
-                        if hasattr(metrics, 'quality_level') and metrics.quality_level:
-                            level_emoji = {"excellent": "🏆", "good": "✅", "acceptable": "⚠️", "poor": "❌", "failed": "💥"}
-                            emoji = level_emoji.get(metrics.quality_level.value, "❓")
-                            console.print(f"[dim]  Calidad: {emoji} {metrics.quality_level.value.upper()}[/dim]")
-                        
-                        if hasattr(metrics, 'thd_plus_n_db') and hasattr(metrics, 'snr_db') and metrics.thd_plus_n_db and metrics.snr_db:
-                            console.print(f"[dim]  THD+N: {metrics.thd_plus_n_db:.1f}dB | SNR: {metrics.snr_db:.1f}dB[/dim]")
-            else:
+                console.print(f"[dim]Procesados: {result.get('segments_processed', 0)}/{result.get('total_segments', len(segments))} segmentos[/dim]")
+
+                # No mostrar métricas adicionales porque enhanced_splitter ya las muestra durante procesamiento
+            elif result.get('success') == False:
                 console.print("[red]❌ Error en división mejorada[/red]")
                 if 'error' in result:
                     console.print(f"[red]{result['error']}[/red]")
+            else:
+                # Some segments failed but process completed
+                console.print(f"[yellow]⚠ División completada con advertencias[/yellow]")
+                console.print(f"[dim]Exitosos: {result.get('segments_processed', 0)} | "
+                           f"Fallidos: {result.get('segments_failed', 0)}[/dim]")
         else:
             # Usar divisor estándar
             from ..core.splitter import split_audio
@@ -637,10 +623,20 @@ def run_spectrogram_generator():
         
         # Parámetros personalizados
         if spectrogram_type in ["mel", "cqt"]:
-            mel_bins = int(Prompt.ask("🎵 Número de bins Mel/CQT", default="128"))
-            fmin = float(Prompt.ask("📉 Frecuencia mínima (Hz)", default="20"))
-            fmax = float(Prompt.ask("📈 Frecuencia máxima (Hz)", default="8000"))
-            
+            # Usar defaults apropiados según el tipo de espectrograma
+            if spectrogram_type == "mel":
+                default_bins = "128"
+                default_fmin = "20"
+                default_fmax = "8000"
+            else:  # cqt
+                default_bins = "72"  # 6 octavas - seguro para 44.1kHz
+                default_fmin = "32.7"  # C1 - análisis musical
+                default_fmax = "2093"  # C7 - calculado desde n_bins
+
+            mel_bins = int(Prompt.ask("🎵 Número de bins Mel/CQT", default=default_bins))
+            fmin = float(Prompt.ask("📉 Frecuencia mínima (Hz)", default=default_fmin))
+            fmax = float(Prompt.ask("📈 Frecuencia máxima (Hz)", default=default_fmax))
+
             custom_params = {
                 'n_mels': mel_bins if spectrogram_type == "mel" else None,
                 'n_bins': mel_bins if spectrogram_type == "cqt" else None,
@@ -657,14 +653,7 @@ def run_spectrogram_generator():
         
         if use_enhanced:
             # Usar generador mejorado
-            generator = EnhancedSpectrogramGenerator(
-                progress_callback=lambda current, total, msg: 
-                console.print(f"[cyan]Progreso: {current}/{total} - {msg}[/cyan]")
-            )
-            
-            # Configurar opciones de calidad
-            generator.quality_gates_enabled = quality_gates
-            generator.llm_optimized = llm_optimized
+            generator = EnhancedSpectrogramGenerator()
             
         else:
             # Usar generador estándar
@@ -675,79 +664,100 @@ def run_spectrogram_generator():
             )
         
         # Generar según el tipo
-        if spectrogram_type == "mel":
-            if use_enhanced:
-                result = generator.generate_mel_spectrogram_enhanced(input_file, output_file, custom_params)
+        if use_enhanced:
+            # EnhancedSpectrogramGenerator tiene un método unificado
+            if spectrogram_type == "dual":
+                # Para dual, generar mel y linear por separado
+                output_dir = Path(output_file).parent
+                input_path = Path(input_file)
+
+                mel_output = output_dir / f"{input_path.stem}_mel_spectrogram.png"
+                linear_output = output_dir / f"{input_path.stem}_linear_spectrogram.png"
+
+                console.print("[cyan]Generando espectrograma Mel...[/cyan]")
+                mel_result = generator.generate_with_quality_validation(
+                    audio_path=input_file,
+                    output_path=mel_output,
+                    spectrogram_type='mel',
+                    quality_validation=quality_gates,
+                    **custom_params
+                )
+
+                console.print("[cyan]Generando espectrograma Linear...[/cyan]")
+                linear_result = generator.generate_with_quality_validation(
+                    audio_path=input_file,
+                    output_path=linear_output,
+                    spectrogram_type='linear',
+                    quality_validation=quality_gates,
+                    **custom_params
+                )
+                result = {'success': mel_result.get('success') and linear_result.get('success')}
             else:
+                # Generar tipo simple
+                result = generator.generate_with_quality_validation(
+                    audio_path=input_file,
+                    output_path=output_file,
+                    spectrogram_type=spectrogram_type,
+                    quality_validation=quality_gates,
+                    **custom_params
+                )
+        else:
+            # SpectrogramGenerator estándar
+            if spectrogram_type == "mel":
                 result = generator.generate_mel_spectrogram(input_file, output_file, custom_params)
-        elif spectrogram_type == "linear":
-            if use_enhanced:
-                result = generator.generate_linear_spectrogram_enhanced(input_file, output_file, custom_params)
-            else:
+            elif spectrogram_type == "linear":
                 result = generator.generate_linear_spectrogram(input_file, output_file, custom_params)
-        elif spectrogram_type == "cqt":
-            if use_enhanced:
-                result = generator.generate_cqt_spectrogram_enhanced(input_file, output_file, custom_params)
-            else:
+            elif spectrogram_type == "cqt":
                 result = generator.generate_cqt_spectrogram(input_file, output_file, custom_params)
-        elif spectrogram_type == "dual":
-            # Para dual, necesitamos un directorio
-            output_dir = Path(output_file).parent
-            input_path = Path(input_file)
-            
-            mel_output = output_dir / f"{input_path.stem}_mel_spectrogram.png"
-            linear_output = output_dir / f"{input_path.stem}_linear_spectrogram.png"
-            
-            console.print("[cyan]Generando espectrograma Mel...[/cyan]")
-            if use_enhanced:
-                mel_result = generator.generate_mel_spectrogram_enhanced(input_file, mel_output, custom_params)
-            else:
+            elif spectrogram_type == "dual":
+                output_dir = Path(output_file).parent
+                input_path = Path(input_file)
+
+                mel_output = output_dir / f"{input_path.stem}_mel_spectrogram.png"
+                linear_output = output_dir / f"{input_path.stem}_linear_spectrogram.png"
+
+                console.print("[cyan]Generando espectrograma Mel...[/cyan]")
                 mel_result = generator.generate_mel_spectrogram(input_file, mel_output, custom_params)
-            
-            console.print("[cyan]Generando espectrograma Linear...[/cyan]")
-            if use_enhanced:
-                linear_result = generator.generate_linear_spectrogram_enhanced(input_file, linear_output, {})
-            else:
+
+                console.print("[cyan]Generando espectrograma Linear...[/cyan]")
                 linear_result = generator.generate_linear_spectrogram(input_file, linear_output, {})
-            
-            result = {
-                'status': 'success' if mel_result.get('status') == 'success' and linear_result.get('status') == 'success' else 'error',
-                'spectrogram_type': 'dual',
-                'mel_result': mel_result,
-                'linear_result': linear_result
-            }
+
+                result = {
+                    'status': 'success' if mel_result.get('status') == 'success' and linear_result.get('status') == 'success' else 'error',
+                    'spectrogram_type': 'dual',
+                    'mel_result': mel_result,
+                    'linear_result': linear_result
+                }
         
         # Mostrar resultados
-        if result.get('status') == 'success':
+        # EnhancedSpectrogramGenerator usa 'success', SpectrogramGenerator usa 'status'
+        is_success = result.get('success', False) or result.get('status') == 'success'
+
+        if is_success:
             console.print(f"[green]✓ Espectrograma {spectrogram_type.upper()} generado exitosamente[/green]")
-            
-            # Mostrar métricas de calidad científica si se usó el generador mejorado
-            if use_enhanced and show_metrics and 'quality_metrics' in result:
-                display_quality_metrics(
-                    result['quality_metrics'], 
-                    f"📊 Métricas de Calidad del Espectrograma - {spectrogram_type.upper()}"
-                )
-            
-            # Mostrar métricas básicas
-            if 'quality_metrics' in result:
+
+            # NOTA: EnhancedSpectrogramGenerator ya muestra sus propias métricas en _display_quality_results()
+            # No llamamos a display_quality_metrics() porque está diseñada para AudioQualityMetrics
+
+            # Mostrar métricas básicas (solo si NO es enhanced, porque enhanced ya las mostró)
+            if not use_enhanced and 'quality_metrics' in result:
                 metrics = result['quality_metrics']
-                
-                if use_enhanced and hasattr(metrics, 'quality_level'):
-                    level_emoji = {"excellent": "🏆", "good": "✅", "acceptable": "⚠️", "poor": "❌", "failed": "💥"}
-                    emoji = level_emoji.get(metrics.quality_level.value, "❓")
-                    console.print(f"[dim]Calidad científica: {emoji} {metrics.quality_level.value.upper()}[/dim]")
-                
-                # Mostrar resolución y características
-                if hasattr(metrics, 'temporal_resolution_ms') and hasattr(metrics, 'frequency_resolution_hz'):
-                    console.print(f"[dim]Resolución: {metrics.temporal_resolution_ms:.1f}ms temporal, {metrics.frequency_resolution_hz:.1f}Hz frecuencial[/dim]")
-                elif 'temporal_resolution_ms' in metrics and 'frequency_resolution_hz' in metrics:
-                    console.print(f"[dim]Resolución: {metrics['temporal_resolution_ms']:.1f}ms temporal, {metrics['frequency_resolution_hz']:.1f}Hz frecuencial[/dim]")
-                
-                # Información adicional
-                duration = result.get('duration_seconds', metrics.get('duration_seconds'))
-                sample_rate = result.get('sample_rate', metrics.get('sample_rate'))
+
+                # Para SpectrogramGenerator estándar (dict-based metrics)
+                if isinstance(metrics, dict):
+                    if 'temporal_resolution_ms' in metrics and 'frequency_resolution_hz' in metrics:
+                        console.print(f"[dim]Resolución: {metrics['temporal_resolution_ms']:.1f}ms temporal, {metrics['frequency_resolution_hz']:.1f}Hz frecuencial[/dim]")
+
+            # Información del audio (disponible para ambos generadores)
+            if 'audio_properties' in result:
+                audio_props = result['audio_properties']
+                duration = audio_props.get('duration_seconds')
+                sample_rate = audio_props.get('sample_rate')
                 if duration and sample_rate:
-                    console.print(f"[dim]Audio: {duration:.2f}s, {sample_rate}Hz[/dim]")
+                    console.print(f"[dim]Audio: {duration:.2f}s @ {sample_rate}Hz[/dim]")
+            elif 'duration_seconds' in result and 'sample_rate' in result:
+                # Fallback para generador estándar
+                console.print(f"[dim]Audio: {result['duration_seconds']:.2f}s @ {result['sample_rate']}Hz[/dim]")
             
             # Información para uso con LLMs
             console.print("\n[bold yellow]🤖 Información para LLM Context:[/bold yellow]")

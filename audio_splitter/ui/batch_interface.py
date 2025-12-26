@@ -40,10 +40,9 @@ def run_batch_processing():
         console.print("\n[cyan]🔧 Operaciones Batch Disponibles:[/cyan]")
         options = [
             "1. 🔄 Batch Conversion - Convertir múltiples archivos",
-            "2. ✂️  Batch Splitting - Dividir múltiples archivos",
-            "3. 🎧 Batch Channel Conversion - Convertir canales",
-            "4. 📊 Batch Spectrogram - Generar espectrogramas",
-            "5. 🔙 Volver al menú principal"
+            "2. 🎧 Batch Channel Conversion - Convertir canales",
+            "3. 📊 Batch Spectrogram - Generar espectrogramas",
+            "4. 🔙 Volver al menú principal"
         ]
 
         for option in options:
@@ -51,22 +50,20 @@ def run_batch_processing():
 
         choice = Prompt.ask(
             "\nSelecciona operación",
-            choices=["1", "2", "3", "4", "5"],
+            choices=["1", "2", "3", "4"],
             default="1"
         )
 
         if choice == "1":
             run_batch_conversion(processor)
         elif choice == "2":
-            run_batch_splitting(processor)
-        elif choice == "3":
             run_batch_channel_conversion(processor)
-        elif choice == "4":
+        elif choice == "3":
             run_batch_spectrogram(processor)
-        elif choice == "5":
+        elif choice == "4":
             break
 
-        if choice in ["1", "2", "3", "4"]:
+        if choice in ["1", "2", "3"]:
             if not Confirm.ask("\n¿Realizar otra operación batch?", default=False):
                 break
 

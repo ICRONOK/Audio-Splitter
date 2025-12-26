@@ -40,11 +40,21 @@ console = Console()
 
 class SpectrogramQualityLevel(Enum):
     """Spectrogram-specific quality levels"""
-    EXCELLENT = "excellent"    # High resolution, no artifacts, optimal SNR
-    GOOD = "good"             # Good resolution, minimal artifacts
-    ACCEPTABLE = "acceptable"  # Adequate for analysis
-    POOR = "poor"             # Limited usefulness
-    FAILED = "failed"         # Unusable for analysis
+    EXCELLENT = 5    # High resolution, no artifacts, optimal SNR
+    GOOD = 4         # Good resolution, minimal artifacts
+    ACCEPTABLE = 3   # Adequate for analysis
+    POOR = 2         # Limited usefulness
+    FAILED = 1       # Unusable for analysis
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value <= other.value
+        return NotImplemented
 
 
 @dataclass
@@ -642,7 +652,7 @@ class EnhancedSpectrogramGenerator(SpectrogramGenerator):
         }
         
         color = level_colors.get(metrics.quality_level, "white")
-        console.print(f"[{color}]🎯 Spectrogram Quality: {metrics.quality_level.value.upper()}[/{color}]")
+        console.print(f"[{color}]🎯 Spectrogram Quality: {metrics.quality_level.name}[/{color}]")
         console.print(f"[{color}]📊 Quality Score: {metrics.quality_score:.1f}/100[/{color}]")
         console.print(f"[{color}]🤖 LLM Suitability: {metrics.llm_suitability_score:.1f}/100[/{color}]")
         
@@ -711,7 +721,7 @@ class EnhancedSpectrogramGenerator(SpectrogramGenerator):
             # Add quality information as title
             title = f'{spectrogram_type.upper()} Spectrogram'
             if quality_metrics:
-                title += f' (Quality: {quality_metrics.quality_level.value.upper()}, Score: {quality_metrics.quality_score:.1f}/100)'
+                title += f' (Quality: {quality_metrics.quality_level.name}, Score: {quality_metrics.quality_score:.1f}/100)'
             
             ax.set_title(title, fontsize=14, fontweight='bold')
             

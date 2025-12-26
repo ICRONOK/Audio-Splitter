@@ -56,16 +56,13 @@ def interactive_menu_i18n():
             f"5. {t('menu.channel_converter', '🎧 Channel Converter - Conversión mono ↔ stereo')}",
             f"6. {t('menu.workflows', '🔄 Professional Workflows - Automatización de procesos')}",
             f"7. {t('menu.batch_processing', '📦 Batch Processing - Procesamiento masivo de archivos')}",
-            f"8. {t('menu.artwork_manager', '🖼️  Artwork Manager - Gestión de carátulas')}",
-            f"9. {t('menu.quality_settings', '⚙️  Quality Settings - Configuración de calidad científica')}",
-            f"10. {t('menu.documentation', '📄 Documentación y ayuda')}",
-            f"11. {t('menu.exit', '🚪 Salir')}"
+            f"8. {t('menu.exit', '🚪 Salir')}"
         ]
 
         for option in options:
             console.print(f"  {option}")
 
-        choice = Prompt.ask(f"\\n{t('menu.select_module', 'Selecciona un módulo')}", choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"])
+        choice = Prompt.ask(f"\\n{t('menu.select_module', 'Selecciona un módulo')}", choices=["1", "2", "3", "4", "5", "6", "7", "8"])
         
         if choice == "1":
             run_audio_converter_i18n()
@@ -82,12 +79,6 @@ def interactive_menu_i18n():
         elif choice == "7":
             run_batch_processing_i18n()
         elif choice == "8":
-            run_artwork_manager_i18n()
-        elif choice == "9":
-            run_quality_settings_i18n()
-        elif choice == "10":
-            show_documentation_i18n()
-        elif choice == "11":
             console.print(f"\\n[yellow]{t('menu.goodbye', '👋 ¡Gracias por usar Audio Splitter Suite!')}[/yellow]")
             break
 
@@ -181,40 +172,74 @@ def run_single_conversion_i18n(converter: EnhancedAudioConverter):
         # Convert
         console.print(f"\\n[cyan]{t('converter.starting_conversion', 'Iniciando conversión {format}...').format(format=output_format.upper())}[/cyan]")
         
-        result = converter.convert_audio(
-            input_file, output_file, output_format,
-            quality_validation=enable_validation
-        )
+        if enable_validation:
+            # Use enhanced converter with quality validation
+            result = converter.convert_with_quality_validation(
+                input_path=input_file,
+                output_path=output_file,
+                target_format=output_format,
+                quality='high'
+            )
+        else:
+            # Use basic conversion (returns bool)
+            success = converter.convert_file(
+                input_path=input_file,
+                output_path=output_file,
+                target_format=output_format,
+                quality='high'
+            )
+            result = {'success': success}
         
         if result.get('success', False):
             console.print(f"[green]✓ {t('converter.conversion_success', 'Conversión exitosa')}[/green]")
-            
-            if enable_validation and 'quality_result' in result:
-                quality = result['quality_result']
-                level_emoji = {"excellent": "🟢", "good": "🟡", "acceptable": "🟠", "poor": "🔴", "failed": "❌"}
-                emoji = level_emoji.get(quality.overall_quality.value, "❓")
-                console.print(f"[dim]{t('converter.quality_result', 'Calidad del resultado: {emoji} {level}').format(emoji=emoji, level=quality.overall_quality.value.upper())}[/dim]")
+
+            if enable_validation and 'quality_metrics' in result:
+                console.print(f"[dim]{t('converter.quality_validated', '🔬 Conversión con validación de calidad completada')}[/dim]")
         else:
-            console.print(f"[red]✗ {t('converter.conversion_error', 'Error en conversión')}[/red]")
+            error_msg = result.get('error', 'Unknown error')
+            console.print(f"[red]✗ {t('converter.conversion_error', 'Error en conversión: {error}').format(error=error_msg)}[/red]")
             
     except Exception as e:
         console.print(f"[red]{t('converter.execution_error', '❌ Error: {error}').format(error=str(e))}[/red]")
 
 def run_batch_conversion_i18n(converter: EnhancedAudioConverter):
     """Ejecuta conversión por lotes con i18n"""
-    console.print(f"[yellow]{t('converter.batch_coming_soon', '📦 Conversión por lotes - Próximamente en Fase 2')}[/yellow]")
+    try:
+        console.print(f"\n[bold green]✓ {t('batch.title', '📦 Batch Processing')}[/bold green]")
+        # Llamar a la interfaz completa de batch processing
+        run_batch_processing()
+    except Exception as e:
+        console.print(f"[red]{t('common.error', '❌ Error')}: {str(e)}[/red]")
 
 def run_audio_splitter_i18n():
     """Ejecuta el Audio Splitter con interfaz multiidioma"""
-    console.print(f"[yellow]{t('splitter.coming_soon', '✂️ Audio Splitter multiidioma - Próximamente')}[/yellow]")
+    try:
+        # Import the working implementation from interactive.py
+        from .interactive import run_audio_splitter
+        console.print(f"\n[bold green]✓ {t('splitter.title', '✂️ Audio Splitter Enhanced')}[/bold green]")
+        run_audio_splitter()
+    except Exception as e:
+        console.print(f"[red]{t('common.error', '❌ Error')}: {str(e)}[/red]")
 
 def run_metadata_editor_i18n():
     """Ejecuta el Metadata Editor con interfaz multiidioma"""
-    console.print(f"[yellow]{t('metadata.coming_soon', '🏷️ Metadata Editor multiidioma - Próximamente')}[/yellow]")
+    try:
+        # Import the working implementation from interactive.py
+        from .interactive import run_metadata_editor
+        console.print(f"\n[bold green]✓ {t('metadata.title', '🏷️ Metadata Editor')}[/bold green]")
+        run_metadata_editor()
+    except Exception as e:
+        console.print(f"[red]{t('common.error', '❌ Error')}: {str(e)}[/red]")
 
 def run_spectrogram_generator_i18n():
     """Ejecuta el Spectrogram Generator con interfaz multiidioma"""
-    console.print(f"[yellow]{t('spectrogram.coming_soon', '📊 Spectrogram Generator multiidioma - Próximamente')}[/yellow]")
+    try:
+        # Import the working implementation from interactive.py
+        from .interactive import run_spectrogram_generator
+        console.print(f"\n[bold green]✓ {t('spectrogram.title', '📊 Spectrogram Generator')}[/bold green]")
+        run_spectrogram_generator()
+    except Exception as e:
+        console.print(f"[red]{t('common.error', '❌ Error')}: {str(e)}[/red]")
 
 def run_professional_workflows_i18n():
     """Ejecuta Professional Workflows con interfaz multiidioma"""
@@ -238,89 +263,8 @@ def run_batch_processing_i18n():
     except Exception as e:
         console.print(f"[red]{t('common.error', '❌ Error')}: {str(e)}[/red]")
 
-def run_artwork_manager_i18n():
-    """Ejecuta el Artwork Manager con interfaz multiidioma"""
-    console.print(f"[yellow]{t('artwork.coming_soon', '🖼️ Artwork Manager multiidioma - Próximamente')}[/yellow]")
-
-def run_quality_settings_i18n():
-    """Ejecuta la configuración de calidad científica con i18n"""
-    try:
-        settings = get_quality_settings()
-        
-        console.print(Panel(
-            f"[bold blue]{t('quality.title', '⚙️ Configuración de Calidad Científica')}[/bold blue]\\n" +
-            f"[dim]{t('quality.subtitle', 'Gestiona perfiles y preferencias de calidad')}[/dim]",
-            title=t('quality.panel_title', 'Quality Settings')
-        ))
-        
-        while True:
-            console.print(f"\\n[cyan]{t('quality.options_title', '🔧 Opciones de configuración:')}:[/cyan]")
-            options = [
-                f"1. {t('quality.show_current', '📊 Ver configuración actual')}",
-                f"2. {t('quality.change_profile', '🏆 Cambiar perfil de calidad')}",
-                f"3. {t('quality.configure_preferences', '⚙️ Configurar preferencias')}",
-                f"4. {t('quality.custom_thresholds', '🔧 Umbrales personalizados')}",
-                f"5. {t('quality.reset_defaults', '🔄 Restablecer a valores por defecto')}",
-                f"6. {t('common.back_to_menu', '🔙 Volver al menú principal')}"
-            ]
-            
-            for option in options:
-                console.print(f"  {option}")
-            
-            choice = Prompt.ask(
-                t('quality.select_option', 'Selecciona opción'),
-                choices=["1", "2", "3", "4", "5", "6"]
-            )
-            
-            if choice == "1":
-                show_current_quality_settings_i18n(settings)
-            elif choice == "2":
-                change_quality_profile_i18n()
-            elif choice == "3":
-                configure_quality_preferences_i18n()
-            elif choice == "4":
-                configure_custom_thresholds_i18n()
-            elif choice == "5":
-                reset_quality_defaults_i18n()
-            elif choice == "6":
-                break
-                
-    except Exception as e:
-        console.print(f"[red]{t('quality.error_quality', '❌ Error en configuración de calidad: {error}').format(error=str(e))}[/red]")
-
-def show_current_quality_settings_i18n(settings):
-    """Muestra configuración actual con i18n"""
-    console.print(f"\\n[bold cyan]{t('quality.current_settings', '📊 Configuración Actual')}:[/bold cyan]")
-    
-    # Profile info
-    profile = settings.preferences.default_profile
-    profile_emoji = {"studio": "🏆", "professional": "✅", "standard": "⚡", "basic": "📱", "custom": "🔧"}
-    emoji = profile_emoji.get(profile.value, "❓")
-    
-    console.print(f"[white]{t('quality.active_profile', 'Perfil activo')}: {emoji} {profile.value.upper()}[/white]")
-    console.print(f"[white]{t('quality.enhanced_algorithms', 'Algoritmos mejorados')}: {'✅' if settings.preferences.prefer_enhanced_algorithms else '❌'}[/white]")
-    console.print(f"[white]{t('quality.validation_enabled', 'Validación activada')}: {'✅' if settings.preferences.enable_quality_validation else '❌'}[/white]")
-    console.print(f"[white]{t('quality.metrics_display', 'Mostrar métricas')}: {'✅' if settings.preferences.show_detailed_metrics else '❌'}[/white]")
-
-def change_quality_profile_i18n():
-    """Cambia perfil de calidad con i18n"""
-    console.print(f"[yellow]{t('quality.profile_change_coming_soon', '🏆 Cambio de perfil - Implementación completa próximamente')}[/yellow]")
-
-def configure_quality_preferences_i18n():
-    """Configura preferencias con i18n"""
-    console.print(f"[yellow]{t('quality.preferences_coming_soon', '⚙️ Configuración de preferencias - Próximamente')}[/yellow]")
-
-def configure_custom_thresholds_i18n():
-    """Configura umbrales personalizados con i18n"""
-    console.print(f"[yellow]{t('quality.thresholds_coming_soon', '🔧 Umbrales personalizados - Próximamente')}[/yellow]")
-
-def reset_quality_defaults_i18n():
-    """Restablece valores por defecto con i18n"""
-    console.print(f"[yellow]{t('quality.reset_coming_soon', '🔄 Restablecimiento - Próximamente')}[/yellow]")
-
-def show_documentation_i18n():
-    """Muestra documentación con i18n"""
-    console.print(f"[yellow]{t('documentation.coming_soon', '📄 Documentación multiidioma - Próximamente')}[/yellow]")
+# Funciones eliminadas: run_artwork_manager_i18n(), run_quality_settings_i18n(), show_documentation_i18n()
+# Sistema de quality settings sigue funcionando con defaults profesionales
 
 # Entry point principal para la versión i18n
 if __name__ == "__main__":

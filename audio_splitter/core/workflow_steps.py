@@ -14,6 +14,7 @@ from rich.console import Console
 try:
     from ..core.workflow_engine import WorkflowStep, WorkflowContext, WorkflowError
     from ..core.enhanced_converter import EnhancedAudioConverter
+    from ..core.converter import AudioConverter
     from ..core.enhanced_splitter import EnhancedAudioSplitter
     from ..core.enhanced_spectrogram import EnhancedSpectrogramGenerator
     from ..core.metadata_manager import MetadataManager
@@ -21,6 +22,7 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from core.workflow_engine import WorkflowStep, WorkflowContext, WorkflowError
     from core.enhanced_converter import EnhancedAudioConverter
+    from core.converter import AudioConverter
     from core.enhanced_splitter import EnhancedAudioSplitter
     from core.enhanced_spectrogram import EnhancedSpectrogramGenerator
     from core.metadata_manager import MetadataManager
@@ -35,6 +37,7 @@ class ConvertAudioStep(WorkflowStep):
 
     def __init__(self,
                  output_format: str,
+                 bitrate: Optional[str] = None,
                  quality_level: str = "high",
                  quality_validation: bool = True,
                  name: Optional[str] = None):
@@ -45,6 +48,7 @@ class ConvertAudioStep(WorkflowStep):
             required=True
         )
         self.output_format = output_format
+        self.bitrate = bitrate  # e.g., "192k", "320k", "64k", None for lossless
         self.quality_level = quality_level
         self.quality_validation = quality_validation
         self.converter = EnhancedAudioConverter()
@@ -132,13 +136,55 @@ class SplitAudioStep(WorkflowStep):
 
         console.print(f"[cyan]Splitting {input_file} into {len(self.segments)} segments...[/cyan]")
 
-        # Ejecutar división
-        result = self.splitter.split_audio(
-            input_file=str(input_file),
-            segments=self.segments,
-            output_dir=str(output_dir),
-            quality_validation=self.quality_validation
-        )
+        # Parse segments from strings to tuples
+        from ..core.splitter import convert_to_ms
+        parsed_segments = []
+        for seg in self.segments:
+            try:
+                # Format: "inicio-fin:nombre" or "inicio-fin"
+                # Example: "0:00-0:30:intro" or "0:00-0:30"
+                # Need to find the last ':' to separate name from time range
+
+                # Find last occurrence of ':' to separate name
+                last_colon = seg.rfind(':')
+
+                # Check if there's a '-' after the last ':'
+                # If no '-' after last ':', then the last ':' is part of the time, not the name separator
+                if last_colon > 0 and '-' not in seg[last_colon:]:
+                    # Last ':' separates time range from name
+                    time_range = seg[:last_colon]
+                    name = seg[last_colon+1:]
+                else:
+                    # No name, entire string is time range
+                    time_range = seg
+                    name = ""
+
+                start_str, end_str = time_range.split('-')
+                start_ms = convert_to_ms(start_str)
+                end_ms = convert_to_ms(end_str)
+                parsed_segments.append((start_ms, end_ms, name))
+            except Exception as e:
+                raise WorkflowError(f"Error parsing segment '{seg}': {e}")
+
+        # Ejecutar división con el método correcto
+        if self.enhanced or self.quality_validation:
+            # Use enhanced method which accepts quality_validation
+            result = self.splitter.split_audio_enhanced(
+                input_file=str(input_file),
+                segments=parsed_segments,
+                output_dir=str(output_dir),
+                quality_validation=self.quality_validation
+            )
+        else:
+            # Use basic method (returns bool)
+            from ..core.splitter import AudioSplitter
+            basic_splitter = AudioSplitter()
+            success = basic_splitter.split_audio(
+                input_file=str(input_file),
+                segments=parsed_segments,
+                output_dir=str(output_dir)
+            )
+            result = {'success': success, 'segment_files': []}
 
         if result.get('success', False):
             # Registrar archivos generados
@@ -303,13 +349,20 @@ class ValidateQualityStep(WorkflowStep):
     Step para validar calidad de audio procesado
     """
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self,
+                 strict: bool = True,
+                 profile: Optional[str] = None,
+                 compare_formats: bool = False,
+                 name: Optional[str] = None):
         name = name or "Validate Audio Quality"
         super().__init__(
             name=name,
             description="Validar calidad del audio procesado",
             required=False
         )
+        self.strict = strict  # If True, reject on failure; if False, warn only
+        self.profile = profile  # Quality profile: "professional", "studio", etc.
+        self.compare_formats = compare_formats  # Compare FLAC vs MP3 quality
 
     def execute(self, context: WorkflowContext) -> Dict[str, Any]:
         """Ejecutar validación de calidad"""
@@ -326,6 +379,77 @@ class ValidateQualityStep(WorkflowStep):
             'quality_check': 'passed',
             'profile': quality_settings.preferences.default_profile.value
         }
+
+
+class ChannelConversionStep(WorkflowStep):
+    """
+    Step para conversión de canales (mono ↔ stereo)
+    """
+
+    def __init__(self,
+                 target_channels: int,
+                 mixing_algorithm: str = "downmix_center",
+                 preserve_metadata: bool = True,
+                 name: Optional[str] = None):
+        channel_name = "Mono" if target_channels == 1 else "Stereo"
+        name = name or f"Convert to {channel_name}"
+        super().__init__(
+            name=name,
+            description=f"Convertir audio a {channel_name}",
+            required=False  # Opcional
+        )
+        self.target_channels = target_channels
+        self.mixing_algorithm = mixing_algorithm
+        self.preserve_metadata = preserve_metadata
+        self.converter = AudioConverter()
+
+    def validate_preconditions(self, context: WorkflowContext) -> bool:
+        """Validar que existe archivo de entrada"""
+        if not context.input_file:
+            return False
+        return Path(context.input_file).exists()
+
+    def execute(self, context: WorkflowContext) -> Dict[str, Any]:
+        """Ejecutar conversión de canales"""
+        input_file = context.input_file
+        output_dir = Path(context.output_dir or ".")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generar nombre de archivo de salida
+        input_path = Path(input_file)
+        channel_suffix = "mono" if self.target_channels == 1 else "stereo"
+        output_file = output_dir / f"{input_path.stem}_{channel_suffix}{input_path.suffix}"
+
+        console.print(f"[cyan]Converting to {channel_suffix}...[/cyan]")
+
+        # Ejecutar conversión usando AudioConverter
+        success = self.converter.convert_channels(
+            input_path=str(input_file),
+            output_path=str(output_file),
+            target_channels=self.target_channels,
+            mixing_algorithm=self.mixing_algorithm if self.target_channels == 1 else "average",
+            preserve_metadata=self.preserve_metadata
+        )
+
+        if success:
+            # Registrar archivo generado y actualizar input para siguientes steps
+            context.add_intermediate_file('channel_converted', str(output_file))
+            # IMPORTANTE: Actualizar input_file para que siguientes steps usen el archivo convertido
+            context.input_file = str(output_file)
+            console.print(f"[green]✓ Channel conversion successful: {output_file}[/green]")
+
+            return {
+                'output_file': str(output_file),
+                'target_channels': self.target_channels,
+                'algorithm': self.mixing_algorithm
+            }
+        else:
+            raise WorkflowError(f"Channel conversion failed")
+
+    def validate_postconditions(self, context: WorkflowContext) -> bool:
+        """Validar que el archivo convertido existe"""
+        output_file = context.get_intermediate_file('channel_converted')
+        return output_file and Path(output_file).exists()
 
 
 # Factory functions para crear steps comunes

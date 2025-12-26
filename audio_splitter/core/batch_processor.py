@@ -37,7 +37,6 @@ class BatchOperation(Enum):
     SPLIT = "split"
     CHANNEL = "channel"
     SPECTROGRAM = "spectrogram"
-    METADATA = "metadata"
 
 
 @dataclass
@@ -181,12 +180,23 @@ class UniversalBatchProcessor:
 
                 # Convertir
                 try:
-                    result = self.converter.convert_audio(
-                        input_file=str(file),
-                        output_file=str(output_file),
-                        output_format=output_format,
-                        quality_validation=quality_validation
-                    )
+                    if quality_validation:
+                        # Use enhanced converter with quality validation
+                        result = self.converter.convert_with_quality_validation(
+                            input_path=str(file),
+                            output_path=str(output_file),
+                            target_format=output_format,
+                            quality='high'
+                        )
+                    else:
+                        # Use basic conversion (returns bool)
+                        success = self.converter.convert_file(
+                            input_path=str(file),
+                            output_path=str(output_file),
+                            target_format=output_format,
+                            quality='high'
+                        )
+                        result = {'success': success}
 
                     if result.get('success', False):
                         successful += 1
@@ -245,6 +255,37 @@ class UniversalBatchProcessor:
         """
         console.print(f"\n[bold cyan]✂️ Batch Audio Splitting[/bold cyan]")
 
+        # Parse segments from strings to tuples
+        from ..core.splitter import convert_to_ms
+        parsed_segments = []
+        for seg in segments:
+            try:
+                # Format: "inicio-fin:nombre" or "inicio-fin"
+                # Example: "0:00-0:30:intro" or "0:00-0:30"
+                # Need to find the last ':' to separate name from time range
+
+                # Find last occurrence of ':' to separate name
+                last_colon = seg.rfind(':')
+
+                # Check if there's a '-' after the last ':'
+                # If no '-' after last ':', then the last ':' is part of the time, not the name separator
+                if last_colon > 0 and '-' not in seg[last_colon:]:
+                    # Last ':' separates time range from name
+                    time_range = seg[:last_colon]
+                    name = seg[last_colon+1:]
+                else:
+                    # No name, entire string is time range
+                    time_range = seg
+                    name = ""
+
+                start_str, end_str = time_range.split('-')
+                start_ms = convert_to_ms(start_str)
+                end_ms = convert_to_ms(end_str)
+                parsed_segments.append((start_ms, end_ms, name))
+            except Exception as e:
+                console.print(f"[red]Error parsing segment '{seg}': {e}[/red]")
+                return BatchResult(0, 0, 0, 0, [], 0.0)
+
         # Encontrar archivos
         files = self.find_audio_files(input_path, recursive)
 
@@ -253,7 +294,7 @@ class UniversalBatchProcessor:
             return BatchResult(0, 0, 0, 0, [], 0.0)
 
         console.print(f"[cyan]Found {len(files)} audio file(s)[/cyan]")
-        console.print(f"[cyan]Segments: {len(segments)}[/cyan]")
+        console.print(f"[cyan]Segments: {len(parsed_segments)}[/cyan]")
 
         # Crear directorio de salida
         output_path = Path(output_dir)
@@ -285,19 +326,34 @@ class UniversalBatchProcessor:
                 file_output_dir.mkdir(exist_ok=True)
 
                 try:
-                    result = self.splitter.split_audio(
-                        input_file=str(file),
-                        segments=segments,
-                        output_dir=str(file_output_dir),
-                        quality_validation=quality_validation
-                    )
+                    if quality_validation:
+                        # Use enhanced splitter with quality validation
+                        result = self.splitter.split_audio_enhanced(
+                            input_file=str(file),
+                            segments=parsed_segments,
+                            output_dir=str(file_output_dir),
+                            quality_validation=quality_validation
+                        )
+                        # Enhanced returns dict with 'success' key
+                        is_success = result.get('success', False)
+                    else:
+                        # Use basic splitter (returns bool)
+                        from ..core.splitter import AudioSplitter
+                        basic_splitter = AudioSplitter()
+                        success = basic_splitter.split_audio(
+                            input_file=str(file),
+                            segments=parsed_segments,
+                            output_dir=str(file_output_dir)
+                        )
+                        result = {'success': success}
+                        is_success = success
 
-                    if result.get('success', False):
+                    if is_success:
                         successful += 1
                         results.append({
                             'file': str(file),
                             'output_dir': str(file_output_dir),
-                            'segments': len(result.get('segment_files', [])),
+                            'segments': len(parsed_segments),
                             'status': 'success'
                         })
                     else:
@@ -305,7 +361,7 @@ class UniversalBatchProcessor:
                         results.append({
                             'file': str(file),
                             'status': 'failed',
-                            'error': result.get('error', 'Unknown error')
+                            'error': result.get('error', 'Unknown error') if isinstance(result, dict) else 'Split failed'
                         })
 
                 except Exception as e:
@@ -443,13 +499,50 @@ class UniversalBatchProcessor:
                     continue
 
                 try:
-                    result = self.spectrogram_generator.generate_spectrogram(
-                        input_file=str(file),
-                        output_path=str(output_file),
-                        spectrogram_type=spectrogram_type
-                    )
+                    # Call the appropriate method based on spectrogram type
+                    if spectrogram_type == "mel":
+                        result = self.spectrogram_generator.generate_mel_spectrogram(
+                            input_file=str(file),
+                            output_file=str(output_file)
+                        )
+                    elif spectrogram_type == "linear":
+                        result = self.spectrogram_generator.generate_linear_spectrogram(
+                            input_file=str(file),
+                            output_file=str(output_file)
+                        )
+                    elif spectrogram_type == "cqt":
+                        result = self.spectrogram_generator.generate_cqt_spectrogram(
+                            input_file=str(file),
+                            output_file=str(output_file)
+                        )
+                    elif spectrogram_type == "dual":
+                        # Generate both mel and linear
+                        mel_output = output_path / f"{file.stem}_mel_spectrogram.png"
+                        linear_output = output_path / f"{file.stem}_linear_spectrogram.png"
 
-                    if result.get('success', False):
+                        mel_result = self.spectrogram_generator.generate_mel_spectrogram(
+                            input_file=str(file),
+                            output_file=str(mel_output)
+                        )
+                        linear_result = self.spectrogram_generator.generate_linear_spectrogram(
+                            input_file=str(file),
+                            output_file=str(linear_output)
+                        )
+
+                        # Combine results
+                        result = {
+                            'status': 'success' if (mel_result.get('status') == 'success' and
+                                                   linear_result.get('status') == 'success') else 'error',
+                            'mel_output': str(mel_output),
+                            'linear_output': str(linear_output)
+                        }
+                    else:
+                        result = {'status': 'error', 'error': f'Unknown spectrogram type: {spectrogram_type}'}
+
+                    # Check result - SpectrogramGenerator uses 'status', not 'success'
+                    is_success = result.get('status') == 'success'
+
+                    if is_success:
                         successful += 1
                         results.append({
                             'file': str(file),

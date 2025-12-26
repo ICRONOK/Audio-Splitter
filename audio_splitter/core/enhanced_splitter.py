@@ -88,6 +88,7 @@ class EnhancedAudioSplitter(AudioSplitter):
                 'segments_processed': 0,
                 'segments_failed': 0,
                 'total_segments': len(segments),
+                'segment_files': [],  # Track output files
                 'quality_metrics': [],
                 'processing_summary': {}
             }
@@ -111,8 +112,10 @@ class EnhancedAudioSplitter(AudioSplitter):
                 
                 if segment_result['success']:
                     results['segments_processed'] += 1
-                    console.print(f"[green]✓ Segment created:[/green] {segment_result['output_file']}")
-                    
+                    output_file = segment_result['output_file']
+                    results['segment_files'].append(output_file)
+                    console.print(f"[green]✓ Segment created:[/green] {output_file}")
+
                     if quality_validation and segment_result.get('quality_metrics'):
                         results['quality_metrics'].append(segment_result['quality_metrics'])
                         self._display_segment_quality(segment_result['quality_metrics'], name)
@@ -122,7 +125,10 @@ class EnhancedAudioSplitter(AudioSplitter):
             
             # Generate processing summary
             self._generate_processing_summary(results)
-            
+
+            # Add success flag based on results
+            results['success'] = results['segments_processed'] > 0 and results['segments_failed'] == 0
+
             return results
             
         except Exception as e:

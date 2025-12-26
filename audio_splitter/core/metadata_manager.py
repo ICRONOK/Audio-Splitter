@@ -548,29 +548,17 @@ def interactive_mode():
         console.print("\n[cyan]Opciones disponibles:[/cyan]")
         options = [
             "1. Editar archivo individual",
-            "2. Edición por lotes", 
-            "3. Gestión de plantillas",
-            "4. Gestión de carátulas",
-            "5. Validar metadatos",
-            "6. Salir"
+            "2. Salir"
         ]
-        
+
         for option in options:
             console.print(f"  {option}")
-        
-        choice = Prompt.ask("\nSelecciona una opción", choices=["1", "2", "3", "4", "5", "6"])
-        
+
+        choice = Prompt.ask("\nSelecciona una opción", choices=["1", "2"])
+
         if choice == "1":
             _edit_single_file_interactive(editor)
         elif choice == "2":
-            console.print("[yellow]Edición por lotes - Funcionalidad en desarrollo[/yellow]")
-        elif choice == "3":
-            console.print("[yellow]Gestión de plantillas - Funcionalidad en desarrollo[/yellow]")
-        elif choice == "4":
-            console.print("[yellow]Gestión de carátulas - Funcionalidad en desarrollo[/yellow]")
-        elif choice == "5":
-            console.print("[yellow]Validación de metadatos - Funcionalidad en desarrollo[/yellow]")
-        elif choice == "6":
             console.print("[yellow]¡Hasta luego![/yellow]")
             break
 
@@ -692,12 +680,6 @@ def _edit_single_file_interactive(editor: MetadataEditor):
     if Confirm.ask("\n¿Guardar cambios?"):
         if editor.write_metadata(file_path, new_metadata):
             console.print("[green]✓ Metadatos guardados exitosamente[/green]")
-            
-            # Preguntar si guardar como plantilla
-            if Confirm.ask("\n¿Guardar estos metadatos como plantilla?"):
-                template_name = Prompt.ask("Nombre de la plantilla")
-                if template_name:
-                    console.print("[yellow]Funcionalidad de plantillas - En desarrollo[/yellow]")
         else:
             console.print("[red]✗ Error guardando metadatos[/red]")
     else:

@@ -547,14 +547,11 @@ def handle_spectrogram_command(args):
         
         if use_enhanced:
             console.print("[cyan]🔬 Usando generador mejorado con puertas de calidad científica[/cyan]")
-            generator = EnhancedSpectrogramGenerator(
-                progress_callback=lambda current, total, msg: 
-                console.print(f"[cyan]Progress: {current}/{total} - {msg}[/cyan]")
-            )
+            generator = EnhancedSpectrogramGenerator()
         else:
             console.print("[cyan]⚡ Usando generador estándar[/cyan]")
             generator = SpectrogramGenerator(
-                progress_callback=lambda current, total, msg: 
+                progress_callback=lambda current, total, msg:
                 console.print(f"[cyan]Progress: {current}/{total} - {msg}[/cyan]")
             )
         
@@ -637,15 +634,14 @@ def handle_spectrogram_command(args):
             console.print(f"[red]Tipo de espectrograma no reconocido: {args.type}[/red]")
             return False
         
-        if result['status'] == 'success':
+        # Verificar éxito (compatible con ambos generadores)
+        is_success = result.get('success', False) or result.get('status') == 'success'
+
+        if is_success:
             console.print(f"[green]✓ Espectrograma {args.type} generado exitosamente[/green]")
-            
-            # Mostrar métricas de calidad científica si se usó el generador mejorado
-            if use_enhanced and args.show_quality_metrics and 'quality_metrics' in result:
-                display_quality_metrics(
-                    result['quality_metrics'], 
-                    f"📊 Métricas de Calidad del Espectrograma - {args.type.upper()}"
-                )
+
+            # NOTA: EnhancedSpectrogramGenerator ya muestra sus propias métricas
+            # No llamamos a display_quality_metrics() porque está diseñada para AudioQualityMetrics
             
             # Mostrar métricas básicas LLM
             if 'quality_metrics' in result:
@@ -678,8 +674,10 @@ def handle_spectrogram_command(args):
             
         else:
             console.print("[red]✗ Error generando espectrograma[/red]")
-            
-        return result['status'] == 'success'
+            if 'error' in result:
+                console.print(f"[red]{result['error']}[/red]")
+
+        return is_success
         
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")

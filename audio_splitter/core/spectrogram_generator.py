@@ -53,6 +53,12 @@ class SpectrogramGenerator:
             'nperseg': 2048,            # STFT segment length
             'noverlap': 1536            # 75% overlap
         },
+        'cqt_scale': {
+            'fmin': 32.7,               # ~C1, musical analysis lower bound
+            'n_bins': 72,               # 6 octaves * 12 semitones (safe for 44.1kHz)
+            'bins_per_octave': 12,      # Standard musical scale
+            'hop_length': 512           # Consistent temporal resolution
+        },
         'visual': {
             'figsize': (12.8, 5.12),   # 1024x512 pixels @ 80 DPI
             'dpi': 80,                  # LLM-optimal resolution
